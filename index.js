@@ -5,27 +5,25 @@ const Fuse = require('fuse.js');
 const app = express();
 
 const phoneNumber = "8801865760508"; 
-const adminNumber = "96897657655@s.whatsapp.net"; 
+const adminNumber = "96897657655@s.whatsapp.net"; // 👈 এখানে আপনার নম্বর একবারই দেবেন
 
 const supportModeUsers = new Set();
 const userSearchSessions = new Map();
 
-// বইয়ের ডাটাবেস
 const booksPart1 = require('./books.json');
 const booksDatabase = [...booksPart1]; 
 
-// AI ফাইল
-const { extractBookKeyword } = require('./ai'); 
+const { extractBookKeyword, getGeminiReply } = require('./ai'); 
 
 // ফাজি সার্চ কনফিগারেশন
 const fuseOptions = {
     keys: ['name'],
-    threshold: 0.4,
-    includeScore: true
+    threshold: 0.3, // 👈 ০.৪ থেকে কমিয়ে ০.৩ করলাম যাতে "হাই" বললে উল্টাপাল্টা বই না আসে
+    includeScore: true,
+    minMatchCharLength: 3 // 👈 অন্তত ৩ অক্ষর না মিললে রেজাল্ট দেখাবে না
 };
 const fuse = new Fuse(booksDatabase, fuseOptions);
 
-// 🛠️ বাংলা সংখ্যা কনভার্টার ফাংশন
 const toEnglishDigits = (str) => {
     return str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]);
 };
@@ -37,7 +35,9 @@ async function connectToWhatsApp() {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: "silent" }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        // 👇 পরিবর্তন করা হয়েছে: এতে ফোনের সাথে চ্যাট সিঙ্ক ভালো হয়
+        browser: ["WhatsApp Bot", "Firefox", "1.0.0"], 
+        syncFullHistory: true, // 👇 এটি যোগ করুন, এটি ইতিহাস সিঙ্ক করতে সাহায্য করে
     });
 
     if (!sock.authState.creds.registered) {
@@ -89,10 +89,15 @@ async function connectToWhatsApp() {
         }
         if (supportModeUsers.has(remoteJid)) return;
 
-        // --- মেনু ---
-        const greetings = ["hi", "hello", "salam", "আসসালামু", "সালাম", "menu"];
-        if (greetings.some(word => msgLower.includes(word))) {
-            const menuText = `📚 *আসসালামু আলাইকুম!* ইসলামিক লাইব্রেরিতে স্বাগতম।\n🔍 বই খুঁজতে নাম লিখুন।\n📝 রিকোয়েস্ট করতে 'চাই [বইয়ের নাম]' লিখুন।`;
+        // --- মেনু / গ্রিটিংস (সবার আগে চেক করবে) ---
+        const greetings = ["hi", "hello", "salam", "আসসালামু", "সালাম", "হাই", "হ্যালো", "menu", "মেনু"];
+        
+        // হুবহু শব্দ মিললে অথবা মেসেজটি খুব ছোট হলে মেনু দেখাবে
+        if (greetings.includes(msgLower) || (greetings.some(w => msgLower.includes(w)) && incomingText.length < 10)) {
+            const menuText = `📚 *আসসালামু আলাইকুম!* ইসলামিক লাইব্রেরিতে স্বাগতম।\n\n` +
+                             `🔍 *বই খুঁজতে:* নাম লিখুন (ভুল বানানেও সমস্যা নেই)।\n` +
+                             `📝 *বই রিকোয়েস্ট:* 'চাই [বইয়ের নাম]' লিখুন।\n` +
+                             `❓ *সাহায্য:* 'admin' লিখুন।`;
             await sock.sendMessage(remoteJid, { text: menuText });
             return;
         }
@@ -100,17 +105,15 @@ async function connectToWhatsApp() {
         // --- রিকোয়েস্ট ---
         if (msgLower.startsWith("request") || msgLower.startsWith("চাই") || msgLower.startsWith("রিকোয়েস্ট")) {
             const requestedBook = incomingText.replace(/request|চাই|রিকোয়েস্ট/i, "").trim();
-            if (adminNumber.includes("880")) {
+            if (adminNumber.includes("968")) {
                 await sock.sendMessage(adminNumber, { text: `🔔 *Request:* ${requestedBook}\nFrom: ${remoteJid.split('@')[0]}` });
             }
             await sock.sendMessage(remoteJid, { text: "✅ রিকোয়েস্ট পাঠানো হয়েছে।" });
             return;
         }
 
-        // --- সিলেকশন (১, ২, ৩... বা 1, 2, 3...) ---
-        // প্রথমে বাংলা সংখ্যাকে ইংরেজিতে কনভার্ট করা হচ্ছে
+        // --- সিলেকশন (১, ২, ৩...) ---
         const convertedText = toEnglishDigits(incomingText);
-
         if (userSearchSessions.has(remoteJid) && !isNaN(convertedText)) {
             const selectedIndex = parseInt(convertedText) - 1;
             const pendingBooks = userSearchSessions.get(remoteJid);
@@ -126,8 +129,7 @@ async function connectToWhatsApp() {
                 userSearchSessions.delete(remoteJid);
                 return;
             } else {
-                // ইউজার যদি ভুল সংখ্যা দেয়, তাকে জানানো
-                await sock.sendMessage(remoteJid, { text: "❌ তালিকায় এই নম্বরটি নেই। দয়া করে সঠিক নম্বরটি লিখুন।" });
+                await sock.sendMessage(remoteJid, { text: "❌ তালিকায় এই নম্বরটি নেই।" });
                 return;
             }
         }
@@ -135,19 +137,27 @@ async function connectToWhatsApp() {
         // ==========================================
         // 🔥 ফাজি সার্চ লজিক
         // ==========================================
+        
+        // খুব ছোট শব্দ হলে সার্চ করবে না (AI এর কাছে পাঠাবে)
+        if (incomingText.length < 2) {
+             const aiResponse = await getGeminiReply(incomingText);
+             await sock.sendMessage(remoteJid, { text: aiResponse });
+             return;
+        }
+
         let results = fuse.search(incomingText);
         let matchingBooks = results.map(result => result.item);
 
+        // যদি সরাসরি না পায়, কিওয়ার্ড দিয়ে খুঁজবে
         if (matchingBooks.length === 0) {
-            await sock.sendPresenceUpdate('composing', remoteJid);
             const extractedKeyword = await extractBookKeyword(incomingText);
-            
-            if (extractedKeyword.toLowerCase() !== msgLower) {
+            if (extractedKeyword.toLowerCase() !== msgLower && extractedKeyword.length > 2) {
                 let keywordResults = fuse.search(extractedKeyword);
                 matchingBooks = keywordResults.map(result => result.item);
             }
         }
 
+        // রেজাল্ট প্রসেসিং
         if (matchingBooks.length > 0) {
             userSearchSessions.set(remoteJid, matchingBooks);
             
@@ -157,15 +167,18 @@ async function connectToWhatsApp() {
             for(let i = 0; i < limit; i++) {
                 bookList += `*${i + 1}.* ${matchingBooks[i].name}\n`;
             }
-
             if(matchingBooks.length === 1) {
-                bookList += `\n💡 আপনি *1* বা *১* লিখে রিপ্লাই দিলেই পিডিএফ পেয়ে যাবেন।`;
+                bookList += `\n💡 *1* লিখে রিপ্লাই দিন।`;
             }
-
             await sock.sendMessage(remoteJid, { text: bookList });
 
         } else {
-            await sock.sendMessage(remoteJid, { text: "⚠️ দুঃখিত, বইটি পাওয়া যায়নি।\nআপনি চাইলে *request [বইয়ের নাম]* লিখে রিকোয়েস্ট করতে পারেন।" });
+            // 🛑 বই না পেলে এখন আর সরাসরি "দুঃখিত" বলবে না
+            // বরং AI এর কাছে পাঠাবে। AI সিদ্ধান্ত নেবে এটা গল্প নাকি বই খোঁজ।
+            
+            await sock.sendPresenceUpdate('composing', remoteJid);
+            const aiResponse = await getGeminiReply(incomingText);
+            await sock.sendMessage(remoteJid, { text: aiResponse });
         }
     });
 }
