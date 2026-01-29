@@ -33,6 +33,7 @@
         "dotenv": "^17.2.3",
         "express": "^5.2.1",
         "fuse.js": "^7.1.0",
+        "google-it": "^1.6.4",
         "node-fetch": "^2.7.0",
         "pino": "^10.1.0",
         "qrcode-terminal": "^0.12.0"
