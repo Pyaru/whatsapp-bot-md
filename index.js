@@ -279,37 +279,61 @@ if (botKeywords.includes(msgLower)) {
             return;
         }
 
-        // বই ডাউনলোড (নম্বর সিলেকশন)
+        // ---------------------------------------------
+        // ৫. বই সিলেকশন হ্যান্ডলিং (সার্চ + মেইন লিস্ট)
+        // ---------------------------------------------
         const convertedDigits = toEnglishDigits(incomingText);
         const isOnlyNumber = /^[0-9]+$/.test(convertedDigits);
 
         if (isOnlyNumber) {
             const selectedIndex = parseInt(convertedDigits) - 1;
 
-            // সার্চ সেশন থেকে বই
+            // ক) সার্চ সেশন চেক (আগে যদি সার্চ করে থাকে)
             if (userSearchSessions.has(remoteJid)) {
                 const pendingBooks = userSearchSessions.get(remoteJid);
+                
                 if (selectedIndex >= 0 && selectedIndex < pendingBooks.length) {
                     const selectedBook = pendingBooks[selectedIndex];
-                    await sock.sendMessage(remoteJid, { 
+                    
+                    // 🔥 আগের সেই টেক্সট মেসেজ এখানে ফিরিয়ে আনা হলো
+                    await sock.sendMessage(remoteJid, { text: `✅ *${selectedBook.name}* আপলোড হচ্ছে...` });
+
+                    await sock.sendMessage(remoteJid, {
                         document: { url: selectedBook.link },
                         mimetype: 'application/pdf',
                         fileName: `${selectedBook.name}.pdf`
                     });
+                    
+                    // কাজ শেষে রিয়েকশন
                     await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
                     return; 
                 }
             }
 
-            // মেইন তালিকা থেকে বই
+            // খ) মেইন ডাটাবেস চেক (যদি সেশন না থাকে বা নম্বর সেশনের বাইরে হয়)
             if (selectedIndex >= 0 && selectedIndex < booksDatabase.length) {
                 const globalBook = booksDatabase[selectedIndex];
+
+                // 🔥 মেইন লিস্টের কনফার্মেশন মেসেজ ফিরিয়ে আনা হলো
+                await sock.sendMessage(remoteJid, { 
+                    text: `✅ তালিকা থেকে *${selectedIndex + 1}* নম্বর বইটি (${globalBook.name}) আপলোড হচ্ছে...` 
+                });
+
                 await sock.sendMessage(remoteJid, {
                     document: { url: globalBook.link },
                     mimetype: 'application/pdf',
                     fileName: `${globalBook.name}.pdf`
                 });
+
+                // কাজ শেষে রিয়েকশন
                 await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
+                return;
+            } 
+            
+            // যদি নম্বর ভুল দেয়
+            else {
+                await sock.sendMessage(remoteJid, { text: "❌ এই নম্বরের কোনো বই পাওয়া যায়নি। দয়া করে 'list' লিখে সঠিক নম্বর দেখুন অথবা 'stop' লিখে আবার চেষ্টা করুন।" });
+                await sock.sendMessage(remoteJid, { react: { text: "❌", key: msg.key } });
                 return;
             }
         }
