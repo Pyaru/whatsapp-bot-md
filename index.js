@@ -170,12 +170,13 @@ async function connectToWhatsApp() {
             await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
         }
 
-        // =============================================
-        // 🛠️ এডমিন ও সিস্টেম কমান্ড
+// =============================================
+        // 🛠️ এডমিন কমান্ড (FIXED)
         // =============================================
 
-        // ক) আপডেট কমান্ড (Admin Only) - Fixed & Cleaned
-        if ((msgLower === 'update' || msgLower === 'refresh') && senderNumber === adminNumber) {
+        // ক) আপডেট কমান্ড (Admin Only)
+        // 🔥 পরিবর্তন: senderNumber এর বদলে remoteJid.includes ব্যবহার করা হয়েছে
+        if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
             await sock.sendMessage(remoteJid, { text: "🔄 গুগল শিট থেকে ডাটা আপডেট হচ্ছে..." });
             await loadBooksFromSheet();
             await sock.sendMessage(remoteJid, { text: `✅ আপডেট সম্পন্ন!\n📚 বর্তমানে মোট বই: ${booksDatabase.length} টি।` });
@@ -184,7 +185,8 @@ async function connectToWhatsApp() {
         }
 
         // খ) ব্রডকাস্ট কমান্ড (Admin Only)
-        if (msgLower.startsWith('broadcast') && senderNumber === adminNumber) {
+        // 🔥 পরিবর্তন: এখানেও remoteJid.includes ব্যবহার করা হয়েছে
+        if (msgLower.startsWith('broadcast') && remoteJid.includes(adminNumber)) {
             const messageToSend = incomingText.replace(/broadcast/i, '').trim();
             if (!messageToSend) return sock.sendMessage(remoteJid, { text: "❌ মেসেজ লিখুন। উদাহরণ: broadcast নতুন বই এসেছে!" });
 
