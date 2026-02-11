@@ -5,29 +5,27 @@ const pino = require('pino');
 const express = require('express');
 const Fuse = require('fuse.js'); 
 const fetch = require('node-fetch'); 
-const fs = require('fs'); // ফাইল সিস্টেম মডিউল যুক্ত করা হলো
+const fs = require('fs'); 
 const app = express();
 
 const phoneNumber = "8801865760508"; 
-const adminNumber = "96897657655"; // এডমিন নম্বর (শুধু সংখ্যা)
+const adminNumber = "96897657655"; // এডমিন নম্বর (শুধু সংখ্যা, কান্ট্রি কোড সহ)
 
 // ==========================================
-// 📊 কনফিগারেশন ও ডাটাবেস
+// 📊 গুগল শিট ও ডাটাবেস কনফিগারেশন
 // ==========================================
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=1594849656&single=true&output=csv"; 
 
 let booksDatabase = []; 
-// ==========================================
-// 👥 ইউজার ডাটাবেস (আপডেট করা)
-// ==========================================
 
-const USER_DB_FILE = 'users.json'; // ডাটাবেস ফাইল নাম
-let allUsers = new Set(); // মেমোরি
+// ইউজার ডাটাবেস ফাইল পাথ
+const USER_DB_FILE = 'users.json'; 
+let allUsers = new Set(); 
 
 // ১. চেক করা ফাইল আছে কিনা, না থাকলে এখনই বানিয়ে ফেলবে
 if (!fs.existsSync(USER_DB_FILE)) {
-    fs.writeFileSync(USER_DB_FILE, JSON.stringify([])); // খালি ফাইল তৈরি
+    fs.writeFileSync(USER_DB_FILE, JSON.stringify([])); 
     console.log("📄 নতুন users.json ফাইল তৈরি করা হয়েছে।");
 }
 
@@ -38,21 +36,20 @@ try {
     console.log(`👥 মোট ইউজার লোড হয়েছে: ${allUsers.size} জন`);
 } catch (e) {
     console.error("❌ ইউজার ডাটাবেস লোড এরর:", e);
-    // ফাইল করাপ্ট হলে নতুন করে বানাবে
     fs.writeFileSync(USER_DB_FILE, JSON.stringify([])); 
     allUsers = new Set();
 }
 
-// ৩. নতুন ইউজার সেভ করার ফাংশন (আগেরটাই)
+// ৩. নতুন ইউজার সেভ করার ফাংশন
 function saveUser(jid) {
-    if (jid && !allUsers.has(jid) && !jid.includes("g.us")) { // গ্রুপ বাদ দিয়ে
+    if (jid && !allUsers.has(jid) && !jid.includes("g.us")) { 
         allUsers.add(jid);
         fs.writeFileSync(USER_DB_FILE, JSON.stringify([...allUsers]));
         console.log(`➕ নতুন ইউজার যুক্ত হয়েছে: ${jid}`);
     }
 }
 
-// গুগল শিট লোডার
+// ৪. গুগল শিট লোডার ফাংশন
 async function loadBooksFromSheet() {
     try {
         console.log("📥 গুগল শিট থেকে বই আপডেট হচ্ছে...");
@@ -66,7 +63,9 @@ async function loadBooksFromSheet() {
             if (parts.length >= 2) {
                 const name = parts[0].trim().replace(/"/g, ''); 
                 const link = parts[1].trim();
+                // ৩য় কলামে ক্যাটাগরি (যদি থাকে)
                 const category = parts[2] ? parts[2].trim().replace(/"/g, '') : "";
+                
                 if (link.startsWith('http')) {
                     newBooks.push({ name, link, category });
                 }
@@ -87,7 +86,7 @@ async function loadBooksFromSheet() {
 
 const supportModeUsers = new Set();
 const userSearchSessions = new Map();
-const rateLimitMap = new Map(); // স্প্যাম প্রতিরোধের জন্য
+const rateLimitMap = new Map(); 
 const { extractBookKeyword, getGeminiReply } = require('./ai'); 
 
 const fuseOptions = {
@@ -110,7 +109,7 @@ const cleanUserQuery = (text) => {
 };
 
 // ==========================================
-// 🚀 কানেকশন লজিক
+// 🚀 মেইন কানেকশন লজিক
 // ==========================================
 
 async function connectToWhatsApp() {
@@ -157,32 +156,34 @@ async function connectToWhatsApp() {
 
         if (!incomingText) return; 
 
-        // 🔥 ১. ইউজার সেভ করা (Broadcast এর জন্য)
+        // 🔥 ১. ইউজার সেভ (Broadcast এর জন্য)
         saveUser(remoteJid);
 
-        // 🔥 ২. Anti-Spam (১.৫ সেকেন্ডের মধ্যে বারবার মেসেজ দিলে ইগনোর)
+        // 🔥 ২. Anti-Spam (১ সেকেন্ড কুলডাউন)
         const now = Date.now();
         const lastMsgTime = rateLimitMap.get(remoteJid) || 0;
-        if (now - lastMsgTime < 1000) return; // ১ সেকেন্ড কুলডাউন
+        if (now - lastMsgTime < 1000) return; 
         rateLimitMap.set(remoteJid, now);
 
-        // 🔥 ৩. ওয়েটিং রিয়েকশন (User Feedback)
+        // 🔥 ৩. ওয়েটিং রিয়েকশন
         if (incomingText.length > 1) {
             await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
         }
 
-        // --- এডমিন কমান্ড ---
-        
-        // ক) আপডেট কমান্ড
+        // =============================================
+        // 🛠️ এডমিন ও সিস্টেম কমান্ড
+        // =============================================
+
+        // ক) আপডেট কমান্ড (Admin Only) - Fixed & Cleaned
         if ((msgLower === 'update' || msgLower === 'refresh') && senderNumber === adminNumber) {
-            await sock.sendMessage(remoteJid, { text: "🔄 আপডেট হচ্ছে..." });
+            await sock.sendMessage(remoteJid, { text: "🔄 গুগল শিট থেকে ডাটা আপডেট হচ্ছে..." });
             await loadBooksFromSheet();
-            await sock.sendMessage(remoteJid, { text: `✅ আপডেট সম্পন্ন! বই সংখ্যা: ${booksDatabase.length}` });
+            await sock.sendMessage(remoteJid, { text: `✅ আপডেট সম্পন্ন!\n📚 বর্তমানে মোট বই: ${booksDatabase.length} টি।` });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
 
-        // খ) ব্রডকাস্ট কমান্ড (Admin Only) -> broadcast এই মেসেজটি সবার কাছে যাবে
+        // খ) ব্রডকাস্ট কমান্ড (Admin Only)
         if (msgLower.startsWith('broadcast') && senderNumber === adminNumber) {
             const messageToSend = incomingText.replace(/broadcast/i, '').trim();
             if (!messageToSend) return sock.sendMessage(remoteJid, { text: "❌ মেসেজ লিখুন। উদাহরণ: broadcast নতুন বই এসেছে!" });
@@ -192,7 +193,7 @@ async function connectToWhatsApp() {
             let count = 0;
             for (const userJid of allUsers) {
                 try {
-                    await new Promise(r => setTimeout(r, 1500)); // ১.৫ সেকেন্ড ডিলে (ব্যান ঠেকানোর জন্য)
+                    await new Promise(r => setTimeout(r, 1500)); 
                     await sock.sendMessage(userJid, { text: `📢 *নোটিফিকেশন:*\n\n${messageToSend}` });
                     count++;
                 } catch (e) { console.log(`Failed: ${userJid}`); }
@@ -201,86 +202,67 @@ async function connectToWhatsApp() {
             return;
         }
 
-        // --- সাধারণ ইউজার লজিক ---
+        // গ) সাপোর্ট মোড (Admin Chat)
+        if (['admin', 'এডমিন', 'help'].includes(msgLower)) {
+            supportModeUsers.add(remoteJid);
+            userSearchSessions.delete(remoteJid);
+            await sock.sendMessage(remoteJid, { text: "🛑 সাপোর্ট মোড অন। এডমিন শীঘ্রই রিপ্লাই দেবেন। পুনরায় বট চালু করতে 'bot' লিখুন।" });
+            return;
+        }
 
-        const adminKeywords = ['admin', 'এডমিন', 'help'];
+        // ঘ) বট মোড চালু
+        if (['bot', 'বট', 'start'].includes(msgLower)) {
+            supportModeUsers.delete(remoteJid);
+            await sock.sendMessage(remoteJid, { text: "✅ বট মোড চালু হয়েছে!" });
+            // start লিখলে মেনুও দেখাবে, তাই return দিচ্ছি না, নিচে যাবে...
+        }
 
-if (adminKeywords.includes(msgLower)) {
-    supportModeUsers.add(remoteJid);
-    userSearchSessions.delete(remoteJid);
-    await sock.sendMessage(remoteJid, {
-        text: "🛑 সাপোর্ট মোড অন। এডমিন শীঘ্রই রিপ্লাই দেবেন। পুনরায় বট চালু করতে 'bot' লিখুন।"
-    });
-    return;
-}
-        const botKeywords = ['bot', 'বট', 'start'];
-
-if (botKeywords.includes(msgLower)) {
-    supportModeUsers.delete(remoteJid);
-    await sock.sendMessage(remoteJid, {
-        text: "✅ বট মোড চালু হয়েছে!"
-    });
-    return;
-}
+        // সাপোর্ট মোডে থাকলে এখান থেকেই ফিরে যাবে
         if (supportModeUsers.has(remoteJid)) return;
 
-// =============================================
-        // 🔥 ফিক্সড: এডমিন আপডেট কমান্ড
-        // =============================================
-        if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
-            await sock.sendMessage(remoteJid, { text: "🔄 গুগল শিট থেকে ডাটা আপডেট হচ্ছে..." });
-            await loadBooksFromSheet();
-            await sock.sendMessage(remoteJid, { text: `✅ আপডেট সম্পন্ন!\n📚 বর্তমানে মোট বই: ${booksDatabase.length} টি।` });
+        // ঙ) ক্লিয়ার/স্টপ
+        if (["stop", "cancel", "clear", "শেষ", "বাদ"].includes(msgLower)) {
+            userSearchSessions.delete(remoteJid);
+            await sock.sendMessage(remoteJid, { text: "✅ সার্চ ক্লিয়ার করা হয়েছে।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
 
         // =============================================
-        // 🔥 নতুন ফিচার: নতুন বইয়ের তালিকা (What's New)
+        // 📚 ইউজার ফিচারস
         // =============================================
-        const newBookKeywords = ["new book", "নতুন বই", "আপডেট বই", "নতুন কি বই", "update book", "latest books", "নতুন কি এসেছে"];
-        
-        if (newBookKeywords.some(key => msgLower.includes(key))) {
-            
-            // ডাটাবেস থেকে সবার শেষের ১০টি বই নেওয়া (ধরে নিচ্ছি শেষেরগুলোই নতুন)
-            // slice(-10) মানে শেষের ১০টা, reverse() মানে নতুনটা সবার উপরে দেখাবে
-            const recentBooks = booksDatabase.slice(-10).reverse();
 
+        // ১. নতুন বইয়ের তালিকা (What's New)
+        const newBookKeywords = ["new book", "নতুন বই", "আপডেট বই", "নতুন কি বই", "update book", "latest books", "নতুন কি এসেছে"];
+        if (newBookKeywords.some(key => msgLower.includes(key))) {
+            const recentBooks = booksDatabase.slice(-10).reverse();
             if (recentBooks.length === 0) {
                 await sock.sendMessage(remoteJid, { text: "⚠️ দুঃখিত, ডাটাবেসে কোনো বই পাওয়া যায়নি।" });
                 return;
             }
-
             let updateMsg = "🎉 *আমাদের সংগ্রহের নতুন ১০টি বই:*\n\n";
-            
             recentBooks.forEach((book, index) => {
-                // নাম এবং ক্যাটাগরি (যদি থাকে) সাজিয়ে লেখা
                 const displayName = book.category ? `${book.name} (${book.category})` : book.name;
                 updateMsg += `✨ ${index + 1}. ${displayName}\n`;
             });
-
             updateMsg += "\n💡 *বইটি পেতে:* বইয়ের নাম বা নম্বর লিখে সার্চ করুন।";
-
             await sock.sendMessage(remoteJid, { text: updateMsg });
             await sock.sendMessage(remoteJid, { react: { text: "🆕", key: msg.key } });
             return;
         }
 
-// ---------------------------------------------
-        // ৪. গ্রিটিংস বা মেইন মেনু (PRO ডিজাইন)
-        // ---------------------------------------------
-        const greetings = ["hi", "hello", "salam", "আসসালামু আলাইকুম", "সালাম", "হাই", "মেনু", "menu", "list", "তালিকা"];
+        // ২. মেনু এবং গ্রিটিংস
+        const greetings = ["hi", "hello", "salam", "আসসালামু আলাইকুম", "সালাম", "হাই", "মেনু", "menu", "list", "তালিকা", "start"];
         
-        // লিস্ট বা মেনু চাইলে
         if (greetings.some(w => msgLower.startsWith(w)) && incomingText.length < 20) {
             
-            // কেউ যদি শুধু তালিকা চায়
+            // ক) ফুল লিস্ট
             if (msgLower.includes("list") || msgLower.includes("তালিকা")) {
                 let listText = "📚 *ইসলামিক লাইব্রেরি - সকল বইয়ের তালিকা*\n\n";
-                // ১০টার বেশি বই থাকলে টেক্সট ফাইলে দেব, কম থাকলে মেসেজে
                 if (booksDatabase.length > 50) {
                      booksDatabase.forEach((book, index) => {
-                        listText += `${index + 1}. ${book.name}\n`;
+                        const displayName = book.category ? `${book.name} (${book.category})` : book.name;
+                        listText += `${index + 1}. ${displayName}\n`;
                     });
                     listText += "\n💡 যেকোনো বই পেতে সেই বইয়ের নম্বরটি লিখে মেসেজ দিন।";
                     const buffer = Buffer.from(listText, 'utf-8');
@@ -291,9 +273,9 @@ if (botKeywords.includes(msgLower)) {
                         caption: '📂 সব বইয়ের তালিকা এখানে আছে।'
                     });
                 } else {
-                    // বই কম হলে সরাসরি মেসেজে দেখাবে
                     booksDatabase.forEach((book, index) => {
-                        listText += `*${index + 1}.* ${book.name}\n`;
+                        const displayName = book.category ? `${book.name} (${book.category})` : book.name;
+                        listText += `*${index + 1}.* ${displayName}\n`;
                     });
                     listText += "\n💡 বই পেতে নম্বরটি লিখুন।";
                     await sock.sendMessage(remoteJid, { text: listText });
@@ -302,29 +284,23 @@ if (botKeywords.includes(msgLower)) {
                 return;
             }
 
-            // মেইন মেনু ডিসপ্লে
+            // খ) মেইন মেনু
             const menuText = `📚 *আসসালামু আলাইকুম!* ইসলামিক লাইব্রেরিতে স্বাগতম।\n\n` +
                              `🤖 *আমি মাকতাবা বট* - আপনার ইসলামিক সহকারী।\n\n` +
                              `🔍 *বই খুঁজতে:* দাওয়াতে ইসলামীর বইয়ের নাম লিখুন।\n` +
-                             `📂 *সব বইয়ের নাম:* 'list' বা 'তালিকা' লিখুন।\n` +
+                             `📂 *সব বই:* 'list' বা 'তালিকা' লিখুন।\n` +
+                             `🆕 *নতুন বই:* 'নতুন বই' লিখুন।\n` +
                              `📝 *বই অনুরোধ:* 'request [বইয়ের নাম]' লিখুন।\n` +
                              `⁉️ *সাপোর্ট:* 'admin' লিখে মেসেজ দিন।\n` +
                              `🛑 *সার্চ বাতিল:* 'stop' লিখুন।\n\n` +
                              `💡 _যেকোনো ইসলামিক প্রশ্ন করতে পারেন, আমি উত্তর দেওয়ার চেষ্টা করব ইনশাআল্লাহ।_`;
 
             await sock.sendMessage(remoteJid, { text: menuText });
-            await sock.sendMessage(remoteJid, { react: { text: "👋", key: msg.key } }); // সালাম বা ওয়েভ রিয়েকশন
+            await sock.sendMessage(remoteJid, { react: { text: "👋", key: msg.key } });
             return;
         }
 
-        if (["stop", "cancel", "clear", "শেষ"].includes(msgLower)) {
-            userSearchSessions.delete(remoteJid);
-            await sock.sendMessage(remoteJid, { text: "✅ সার্চ ক্লিয়ার করা হয়েছে।" });
-            await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
-            return;
-        }
-
-        // রিকোয়েস্ট হ্যান্ডলিং
+        // ৩. রিকোয়েস্ট হ্যান্ডলিং
         if (msgLower.startsWith("request") || msgLower.startsWith("চাই")) {
             await sock.sendMessage(adminNumber + "@s.whatsapp.net", { text: `🔔 Request: ${incomingText} \nFrom: ${remoteJid}` });
             await sock.sendMessage(remoteJid, { text: "✅ রিকোয়েস্ট এডমিনের কাছে পাঠানো হয়েছে।" });
@@ -332,58 +308,46 @@ if (botKeywords.includes(msgLower)) {
             return;
         }
 
-        // ---------------------------------------------
-        // ৫. বই সিলেকশন হ্যান্ডলিং (সার্চ + মেইন লিস্ট)
-        // ---------------------------------------------
+        // ৪. নম্বর সিলেকশন ও ডাউনলোড
         const convertedDigits = toEnglishDigits(incomingText);
         const isOnlyNumber = /^[0-9]+$/.test(convertedDigits);
 
         if (isOnlyNumber) {
             const selectedIndex = parseInt(convertedDigits) - 1;
 
-            // ক) সার্চ সেশন চেক (আগে যদি সার্চ করে থাকে)
+            // সার্চ সেশন চেক
             if (userSearchSessions.has(remoteJid)) {
                 const pendingBooks = userSearchSessions.get(remoteJid);
-                
                 if (selectedIndex >= 0 && selectedIndex < pendingBooks.length) {
                     const selectedBook = pendingBooks[selectedIndex];
+                    const displayName = selectedBook.category ? `${selectedBook.name} (${selectedBook.category})` : selectedBook.name;
                     
-                    // 🔥 আগের সেই টেক্সট মেসেজ এখানে ফিরিয়ে আনা হলো
-                    await sock.sendMessage(remoteJid, { text: `✅ *${selectedBook.name}* আপলোড হচ্ছে...` });
-
+                    await sock.sendMessage(remoteJid, { text: `✅ *${displayName}* আপলোড হচ্ছে...` });
                     await sock.sendMessage(remoteJid, {
                         document: { url: selectedBook.link },
                         mimetype: 'application/pdf',
                         fileName: `${selectedBook.name}.pdf`
                     });
-                    
-                    // কাজ শেষে রিয়েকশন
                     await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
                     return; 
                 }
             }
 
-            // খ) মেইন ডাটাবেস চেক (যদি সেশন না থাকে বা নম্বর সেশনের বাইরে হয়)
+            // মেইন তালিকা চেক
             if (selectedIndex >= 0 && selectedIndex < booksDatabase.length) {
                 const globalBook = booksDatabase[selectedIndex];
+                const displayName = globalBook.category ? `${globalBook.name} (${globalBook.category})` : globalBook.name;
 
-                // 🔥 মেইন লিস্টের কনফার্মেশন মেসেজ ফিরিয়ে আনা হলো
-                await sock.sendMessage(remoteJid, { 
-                    text: `✅ তালিকা থেকে *${selectedIndex + 1}* নম্বর বইটি (${globalBook.name}) আপলোড হচ্ছে...` 
-                });
-
+                await sock.sendMessage(remoteJid, { text: `✅ তালিকা থেকে *${selectedIndex + 1}* নম্বর বইটি (${displayName}) আপলোড হচ্ছে...` });
                 await sock.sendMessage(remoteJid, {
                     document: { url: globalBook.link },
                     mimetype: 'application/pdf',
                     fileName: `${globalBook.name}.pdf`
                 });
-
-                // কাজ শেষে রিয়েকশন
                 await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
                 return;
             } 
             
-            // যদি নম্বর ভুল দেয়
             else {
                 await sock.sendMessage(remoteJid, { text: "❌ এই নম্বরের কোনো বই পাওয়া যায়নি। দয়া করে 'list' লিখে সঠিক নম্বর দেখুন অথবা 'stop' লিখে আবার চেষ্টা করুন।" });
                 await sock.sendMessage(remoteJid, { react: { text: "❌", key: msg.key } });
@@ -391,13 +355,12 @@ if (botKeywords.includes(msgLower)) {
             }
         }
 
-        // স্মার্ট সার্চ এবং AI
+        // ৫. সার্চ এবং AI
         let searchQuery = cleanUserQuery(incomingText);
         let results = fuse.search(searchQuery);
         let matchingBooks = results.map(result => result.item);
 
         if (matchingBooks.length === 0) {
-            // কীওয়ার্ড দিয়ে পুনরায় চেষ্টা
             const extractedKeyword = await extractBookKeyword(incomingText);
             if (extractedKeyword !== incomingText) {
                 let keywordResults = fuse.search(cleanUserQuery(extractedKeyword));
@@ -409,16 +372,21 @@ if (botKeywords.includes(msgLower)) {
             userSearchSessions.set(remoteJid, matchingBooks);
             let bookList = `🔍 *সম্ভাব্য ব‌ই পাওয়া গেছে:* (নম্বরটি লিখে রিপ্লাই দিন)\n\n`;
             const limit = Math.min(matchingBooks.length, 10);
+            
             for(let i = 0; i < limit; i++) {
-                bookList += `*${i + 1}.* ${matchingBooks[i].name}\n`;
+                const book = matchingBooks[i];
+                // 🔥 ফিক্সড: ক্যাটাগরি সহ নাম দেখাবে
+                const displayName = book.category ? `${book.name} (${book.category})` : book.name;
+                bookList += `*${i + 1}.* ${displayName}\n`;
             }
+            bookList += `\n💡 বই পেতে নম্বরটি লিখুন।`;
+
             await sock.sendMessage(remoteJid, { text: bookList });
             await sock.sendMessage(remoteJid, { react: { text: "📚", key: msg.key } });
 
         } else {
-            // AI রিপ্লাই (মেমোরি সহ)
+            // AI রিপ্লাই
             await sock.sendPresenceUpdate('composing', remoteJid);
-            // 🔥 remoteJid পাস করা হলো মেমোরির জন্য
             const aiResponse = await getGeminiReply(incomingText, remoteJid);
             await sock.sendMessage(remoteJid, { text: aiResponse });
             await sock.sendMessage(remoteJid, { react: { text: "🤖", key: msg.key } });
@@ -428,7 +396,7 @@ if (botKeywords.includes(msgLower)) {
 
 // সার্ভার স্টার্ট
 loadBooksFromSheet();
-setInterval(loadBooksFromSheet, 30 * 60 * 1000); // প্রতি ৩০ মিনিটে আপডেট
+setInterval(loadBooksFromSheet, 30 * 60 * 1000); 
 
 app.get('/', (req, res) => res.send('Pro Islamic Bot Running...'));
 app.listen(process.env.PORT || 3000, () => console.log('Server started'));
