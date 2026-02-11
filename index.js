@@ -18,21 +18,32 @@ const adminNumber = "96897657655"; // এডমিন নম্বর (শুধ
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=1594849656&single=true&output=csv"; 
 
 let booksDatabase = []; 
-const USER_DB_FILE = 'users.json'; // ইউজার ডাটাবেস ফাইল
-let allUsers = new Set(); // মেমোরিতে ইউজার লিস্ট
+// ==========================================
+// 👥 ইউজার ডাটাবেস (আপডেট করা)
+// ==========================================
 
-// ইউজার ডাটাবেস লোড করা
-if (fs.existsSync(USER_DB_FILE)) {
-    try {
-        const data = fs.readFileSync(USER_DB_FILE);
-        allUsers = new Set(JSON.parse(data));
-        console.log(`👥 পূর্ববর্তী ইউজার লোড হয়েছে: ${allUsers.size} জন`);
-    } catch (e) {
-        console.error("User DB Load Error:", e);
-    }
+const USER_DB_FILE = 'users.json'; // ডাটাবেস ফাইল নাম
+let allUsers = new Set(); // মেমোরি
+
+// ১. চেক করা ফাইল আছে কিনা, না থাকলে এখনই বানিয়ে ফেলবে
+if (!fs.existsSync(USER_DB_FILE)) {
+    fs.writeFileSync(USER_DB_FILE, JSON.stringify([])); // খালি ফাইল তৈরি
+    console.log("📄 নতুন users.json ফাইল তৈরি করা হয়েছে।");
 }
 
-// নতুন ইউজার সেভ করার ফাংশন
+// ২. ফাইল থেকে ডাটা লোড করা
+try {
+    const data = fs.readFileSync(USER_DB_FILE);
+    allUsers = new Set(JSON.parse(data));
+    console.log(`👥 মোট ইউজার লোড হয়েছে: ${allUsers.size} জন`);
+} catch (e) {
+    console.error("❌ ইউজার ডাটাবেস লোড এরর:", e);
+    // ফাইল করাপ্ট হলে নতুন করে বানাবে
+    fs.writeFileSync(USER_DB_FILE, JSON.stringify([])); 
+    allUsers = new Set();
+}
+
+// ৩. নতুন ইউজার সেভ করার ফাংশন (আগেরটাই)
 function saveUser(jid) {
     if (jid && !allUsers.has(jid) && !jid.includes("g.us")) { // গ্রুপ বাদ দিয়ে
         allUsers.add(jid);
@@ -212,6 +223,48 @@ if (botKeywords.includes(msgLower)) {
     return;
 }
         if (supportModeUsers.has(remoteJid)) return;
+
+// =============================================
+        // 🔥 ফিক্সড: এডমিন আপডেট কমান্ড
+        // =============================================
+        if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
+            await sock.sendMessage(remoteJid, { text: "🔄 গুগল শিট থেকে ডাটা আপডেট হচ্ছে..." });
+            await loadBooksFromSheet();
+            await sock.sendMessage(remoteJid, { text: `✅ আপডেট সম্পন্ন!\n📚 বর্তমানে মোট বই: ${booksDatabase.length} টি।` });
+            await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
+            return;
+        }
+
+        // =============================================
+        // 🔥 নতুন ফিচার: নতুন বইয়ের তালিকা (What's New)
+        // =============================================
+        const newBookKeywords = ["new book", "নতুন বই", "আপডেট বই", "নতুন কি বই", "update book", "latest books", "নতুন কি এসেছে"];
+        
+        if (newBookKeywords.some(key => msgLower.includes(key))) {
+            
+            // ডাটাবেস থেকে সবার শেষের ১০টি বই নেওয়া (ধরে নিচ্ছি শেষেরগুলোই নতুন)
+            // slice(-10) মানে শেষের ১০টা, reverse() মানে নতুনটা সবার উপরে দেখাবে
+            const recentBooks = booksDatabase.slice(-10).reverse();
+
+            if (recentBooks.length === 0) {
+                await sock.sendMessage(remoteJid, { text: "⚠️ দুঃখিত, ডাটাবেসে কোনো বই পাওয়া যায়নি।" });
+                return;
+            }
+
+            let updateMsg = "🎉 *আমাদের সংগ্রহের নতুন ১০টি বই:*\n\n";
+            
+            recentBooks.forEach((book, index) => {
+                // নাম এবং ক্যাটাগরি (যদি থাকে) সাজিয়ে লেখা
+                const displayName = book.category ? `${book.name} (${book.category})` : book.name;
+                updateMsg += `✨ ${index + 1}. ${displayName}\n`;
+            });
+
+            updateMsg += "\n💡 *বইটি পেতে:* বইয়ের নাম বা নম্বর লিখে সার্চ করুন।";
+
+            await sock.sendMessage(remoteJid, { text: updateMsg });
+            await sock.sendMessage(remoteJid, { react: { text: "🆕", key: msg.key } });
+            return;
+        }
 
 // ---------------------------------------------
         // ৪. গ্রিটিংস বা মেইন মেনু (PRO ডিজাইন)
