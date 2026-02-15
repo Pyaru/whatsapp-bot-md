@@ -1,15 +1,16 @@
-import type { WAMediaUploadFunction, WAUrlInfo } from '../Types/index.js';
-import type { ILogger } from './logger.js';
+import { AxiosRequestConfig } from 'axios';
+import { Logger } from 'pino';
+import { WAMediaUploadFunction, WAUrlInfo } from '../Types';
 export type URLGenerationOptions = {
     thumbnailWidth: number;
     fetchOpts: {
         /** Timeout in ms */
         timeout: number;
         proxyUrl?: string;
-        headers?: HeadersInit;
+        headers?: AxiosRequestConfig<{}>['headers'];
     };
     uploadImage?: WAMediaUploadFunction;
-    logger?: ILogger;
+    logger?: Logger;
 };
 /**
  * Given a piece of text, checks for any URL present, generates link preview for the same and returns it
@@ -18,4 +19,3 @@ export type URLGenerationOptions = {
  * @returns the URL info required to generate link preview
  */
 export declare const getUrlInfo: (text: string, opts?: URLGenerationOptions) => Promise<WAUrlInfo | undefined>;
-//# sourceMappingURL=link-preview.d.ts.map
