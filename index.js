@@ -130,7 +130,6 @@ async function connectToWhatsApp() {
 
         if (incomingText.length > 1) await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
 
-=============================================
         // 🕵️ এডমিন আইডি বের করার যন্তর (DEBUG TOOL)
         // =============================================
         
