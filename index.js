@@ -8,7 +8,7 @@ const qrcode = require('qrcode-terminal'); // QR দেখানোর জন্
 const app = express();
 
 const phoneNumber = "8801865760508"; 
-const adminNumber = "96897657655"; // এডমিন নম্বর
+const adminNumber = "228088717828220"; // এডমিন নম্বর
 
 // ==========================================
 // 📊 কনফিগারেশন
