@@ -54,7 +54,7 @@ async function loadBooksFromSheet() {
         });
         booksDatabase = newBooks;
         if (fuse) fuse.setCollection(booksDatabase);
-        console.log(`✅ ${booksDatabase.length} টি বই লোড হয়েছে!`);
+        console.log(`✅ ${booksDatabase.length} টি বই আপলোড হয়েছে!`);
     } catch (error) { console.error("❌ বই লোড এরর:", error); }
 }
 
@@ -130,7 +130,18 @@ async function connectToWhatsApp() {
 
         if (incomingText.length > 1) await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
 
-        // এডমিন কমান্ড
+=============================================
+        // 🕵️ এডমিন আইডি বের করার যন্তর (DEBUG TOOL)
+        // =============================================
+        
+        // শুধু 'id' বা 'check' লিখলে বট আপনার আসল আইডি বলে দেবে
+        if (msgLower === 'id' || msgLower === 'check') {
+            await sock.sendMessage(remoteJid, { 
+                text: `🕵️ *বট আপনাকে যে আইডিতে দেখছে:*\n\nID: ${remoteJid}\n\n(এই আইডিটি কপি করে adminNumber এ বসালে সব কমান্ড কাজ করবে)` 
+            });
+            return;
+        }
+        
         if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
             await sock.sendMessage(remoteJid, { text: "🔄 আপডেট হচ্ছে..." });
             await loadBooksFromSheet();
@@ -141,7 +152,7 @@ async function connectToWhatsApp() {
 
         if (msgLower.startsWith('broadcast') && remoteJid.includes(adminNumber)) {
             const messageToSend = incomingText.replace(/broadcast/i, '').trim();
-            if (!messageToSend) return sock.sendMessage(remoteJid, { text: "❌ মেসেজ দিন।" });
+            if (!messageToSend) return sock.sendMessage(remoteJid, { text: "❌ মেসেজ দিন। উদাহরণ: broadcast নতুন ১০টি ব‌ই যুক্ত হয়েছে" });
             await sock.sendMessage(remoteJid, { text: `📢 ${allUsers.size} জনকে পাঠানো হচ্ছে...` });
             let count = 0;
             for (const userJid of allUsers) {
@@ -151,19 +162,19 @@ async function connectToWhatsApp() {
             return;
         }
 
-        if (['admin', 'help'].includes(msgLower)) {
+        if (['admin', 'এডমিন', 'help'].includes(msgLower)) {
             supportModeUsers.add(remoteJid);
             userSearchSessions.delete(remoteJid);
-            await sock.sendMessage(remoteJid, { text: "🛑 সাপোর্ট মোড অন।" });
+            await sock.sendMessage(remoteJid, { text: "🛑 সাপোর্ট মোড চালু হয়েছে, এডমিন শিঘ্রই আপনার সাথে যোগাযোগ করবেন, পুনরায় বট চালু করার জন্য bot, বা start লিখুন।" });
             return;
         }
-        if (['bot', 'start'].includes(msgLower)) {
+        if (['bot', 'বট', 'start'].includes(msgLower)) {
             supportModeUsers.delete(remoteJid);
             await sock.sendMessage(remoteJid, { text: "✅ বট চালু হয়েছে!" });
         }
         if (supportModeUsers.has(remoteJid)) return;
 
-        if (["stop", "clear"].includes(msgLower)) {
+        if (["stop", "বাদ", "clear"].includes(msgLower)) {
             userSearchSessions.delete(remoteJid);
             await sock.sendMessage(remoteJid, { text: "✅ ক্লিয়ার।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
@@ -173,7 +184,7 @@ async function connectToWhatsApp() {
         // রিকোয়েস্ট
         if (msgLower.startsWith("request") || msgLower.startsWith("চাই")) {
             await sock.sendMessage(adminNumber + "@s.whatsapp.net", { text: `🔔 Request: ${incomingText} \nFrom: ${remoteJid}` });
-            await sock.sendMessage(remoteJid, { text: "✅ রিকোয়েস্ট পাঠানো হয়েছে।" });
+            await sock.sendMessage(remoteJid, { text: "✅ এডমিনকে রিকোয়েস্ট পাঠানো হয়েছে।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
@@ -237,7 +248,7 @@ async function connectToWhatsApp() {
 
         if (matchingBooks.length > 0) {
             userSearchSessions.set(remoteJid, matchingBooks);
-            let bookList = `🔍 *পাওয়া গেছে:* (নম্বর দিন)\n\n`;
+            let bookList = `🔍 *সম্ভাব্য ব‌ই পাওয়া গেছে:* (ব‌ইয়ের নাম্বর লিখে রিপ্লাই দিন)\n\n`;
             const limit = Math.min(matchingBooks.length, 10);
             for(let i = 0; i < limit; i++) {
                 const book = matchingBooks[i];
@@ -248,21 +259,38 @@ async function connectToWhatsApp() {
             await sock.sendMessage(remoteJid, { react: { text: "📚", key: msg.key } });
         } else {
             // গ্রিটিংস ও মেনু
-            const greetings = ["hi", "hello", "salam", "আসসালামু আলাইকুম", "মেনু", "menu", "list", "তালিকা"];
-            if (greetings.some(w => msgLower.startsWith(w)) && incomingText.length < 20) {
-                if (msgLower.includes("list") || msgLower.includes("তালিকা")) {
-                    let listText = "📚 *সকল বইয়ের তালিকা*\n\n";
-                    if (booksDatabase.length > 50) {
-                        booksDatabase.forEach((book, index) => listText += `${index + 1}. ${book.name} ${book.category ? '('+book.category+')' : ''}\n`);
-                        const buffer = Buffer.from(listText, 'utf-8');
-                        await sock.sendMessage(remoteJid, { document: buffer, mimetype: 'text/plain', fileName: 'Book_List.txt', caption: '📂 সব বইয়ের তালিকা।' });
-                    } else {
-                        booksDatabase.forEach((book, index) => listText += `*${index + 1}.* ${book.name}\n`);
-                        await sock.sendMessage(remoteJid, { text: listText });
-                    }
-                    await sock.sendMessage(remoteJid, { react: { text: "📜", key: msg.key } });
-                    return;
+            const greetings = ["হ্যালো", "hi", "হাই", "hello", "salam", "আসসালামু আলাইকুম", "মেনু", "menu"];
+           
+            // ক) ফুল লিস্ট (বাংলা ফিক্সড ভার্সন)
+            if (msgLower.includes("তালিকা") || msgLower.includes("list")) {
+                let listText = "📚 *সকল বইয়ের তালিকা*\n\n";
+
+                // যদি ৫০ টার বেশি বই থাকে, তবে ফাইল দেবে
+                if (booksDatabase.length > 50) {
+                    // লিস্ট তৈরি করা
+                    booksDatabase.forEach((book, index) => listText += `${index + 1}. ${book.name} ${book.category ? '('+book.category+')' : ''}\n`);
+                    
+                    // 🔥 ফিক্স: '\uFEFF' যুক্ত করা হলো (যাতে বাংলা সাপোর্ট করে)
+                    const buffer = Buffer.from('\uFEFF' + listText, 'utf-8');
+
+                    await sock.sendMessage(remoteJid, { 
+                        document: buffer, 
+                        mimetype: 'text/plain; charset=utf-8', // 🔥 charset বলে দেওয়া হলো
+                        fileName: 'Book_List.txt', 
+                        caption: '📂 সব বইয়ের তালিকা।' 
+                    });
+                } else {
+                    // ৫০ টার কম হলে সরাসরি মেসেজে দেখাবে
+                    booksDatabase.forEach((book, index) => {
+                        const displayName = book.category ? `${book.name} (${book.category})` : book.name;
+                        listText += `*${index + 1}.* ${displayName}\n`;
+                    });
+                    await sock.sendMessage(remoteJid, { text: listText });
                 }
+                await sock.sendMessage(remoteJid, { react: { text: "📜", key: msg.key } });
+                return;
+            }
+            
                 const menuText = `📚 *আসসালামু আলাইকুম!* ইসলামিক লাইব্রেরিতে স্বাগতম।\n\n` +
                                  `🤖 *মাকতাবা বট*\n` +
                                  `🔍 *খুঁজতে:* বইয়ের নাম লিখুন।\n` +
