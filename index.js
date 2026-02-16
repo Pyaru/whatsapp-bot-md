@@ -91,13 +91,11 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, // ✅ QR কোড অন করা হলো
+        printQRInTerminal: true, // ✅ QR কোড অন
         logger: pino({ level: "silent" }),
         browser: ["Ubuntu", "Chrome", "20.0.04"],
         syncFullHistory: false, 
     });
-
-    // ❌ Pairing Code বাদ দেওয়া হয়েছে, তাই কোড আসবে না, QR আসবে
 
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
@@ -116,7 +114,7 @@ async function connectToWhatsApp() {
         if (!msg.message || msg.key.fromMe) return;
 
         const remoteJid = msg.key.remoteJid;
-        const senderNumber = remoteJid.split('@')[0];
+        // const senderNumber = remoteJid.split('@')[0];
         const incomingText = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
         const msgLower = incomingText.toLowerCase();
 
@@ -131,9 +129,6 @@ async function connectToWhatsApp() {
         if (incomingText.length > 1) await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
 
         // 🕵️ এডমিন আইডি বের করার যন্তর (DEBUG TOOL)
-        // =============================================
-        
-        // শুধু 'id' বা 'check' লিখলে বট আপনার আসল আইডি বলে দেবে
         if (msgLower === 'id' || msgLower === 'check') {
             await sock.sendMessage(remoteJid, { 
                 text: `🕵️ *বট আপনাকে যে আইডিতে দেখছে:*\n\nID: ${remoteJid}\n\n(এই আইডিটি কপি করে adminNumber এ বসালে সব কমান্ড কাজ করবে)` 
@@ -141,6 +136,7 @@ async function connectToWhatsApp() {
             return;
         }
         
+        // আপডেট কমান্ড
         if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
             await sock.sendMessage(remoteJid, { text: "🔄 আপডেট হচ্ছে..." });
             await loadBooksFromSheet();
@@ -149,18 +145,22 @@ async function connectToWhatsApp() {
             return;
         }
 
+        // ব্রডকাস্ট কমান্ড
         if (msgLower.startsWith('broadcast') && remoteJid.includes(adminNumber)) {
             const messageToSend = incomingText.replace(/broadcast/i, '').trim();
             if (!messageToSend) return sock.sendMessage(remoteJid, { text: "❌ মেসেজ দিন। উদাহরণ: broadcast নতুন ১০টি ব‌ই যুক্ত হয়েছে" });
             await sock.sendMessage(remoteJid, { text: `📢 ${allUsers.size} জনকে পাঠানো হচ্ছে...` });
             let count = 0;
             for (const userJid of allUsers) {
+                // LID এবং গ্রুপ বাদ
+                if (userJid.includes('@lid') || userJid.includes('g.us')) continue;
                 try { await new Promise(r => setTimeout(r, 1500)); await sock.sendMessage(userJid, { text: `📢 *নোটিফিকেশন:*\n\n${messageToSend}` }); count++; } catch (e) {}
             }
             await sock.sendMessage(remoteJid, { text: `✅ সম্পন্ন: ${count} জন।` });
             return;
         }
 
+        // সাপোর্ট/বট মোড
         if (['admin', 'এডমিন', 'help'].includes(msgLower)) {
             supportModeUsers.add(remoteJid);
             userSearchSessions.delete(remoteJid);
@@ -173,6 +173,7 @@ async function connectToWhatsApp() {
         }
         if (supportModeUsers.has(remoteJid)) return;
 
+        // ক্লিয়ার
         if (["stop", "বাদ", "clear"].includes(msgLower)) {
             userSearchSessions.delete(remoteJid);
             await sock.sendMessage(remoteJid, { text: "✅ ক্লিয়ার।" });
@@ -202,7 +203,7 @@ async function connectToWhatsApp() {
             return;
         }
 
-        // বই ডাউনলোড
+        // বই ডাউনলোড (নম্বর সিলেকশন)
         const convertedDigits = toEnglishDigits(incomingText);
         const isOnlyNumber = /^[0-9]+$/.test(convertedDigits);
         if (isOnlyNumber) {
@@ -257,29 +258,21 @@ async function connectToWhatsApp() {
             await sock.sendMessage(remoteJid, { text: bookList });
             await sock.sendMessage(remoteJid, { react: { text: "📚", key: msg.key } });
         } else {
-            // গ্রিটিংস ও মেনু
-            const greetings = ["হ্যালো", "hi", "হাই", "hello", "salam", "আসসালামু আলাইকুম", "মেনু", "menu"];
-           
-            // ক) ফুল লিস্ট (বাংলা ফিক্সড ভার্সন)
+            // 🔥 ফিক্সড: বই না পেলে আগে লিস্ট/মেনু চেক করবে, তারপর AI
+            
+            // ক) ফুল লিস্ট
             if (msgLower.includes("তালিকা") || msgLower.includes("list")) {
                 let listText = "📚 *সকল বইয়ের তালিকা*\n\n";
-
-                // যদি ৫০ টার বেশি বই থাকে, তবে ফাইল দেবে
                 if (booksDatabase.length > 50) {
-                    // লিস্ট তৈরি করা
                     booksDatabase.forEach((book, index) => listText += `${index + 1}. ${book.name} ${book.category ? '('+book.category+')' : ''}\n`);
-                    
-                    // 🔥 ফিক্স: '\uFEFF' যুক্ত করা হলো (যাতে বাংলা সাপোর্ট করে)
-                    const buffer = Buffer.from('\uFEFF' + listText, 'utf-8');
-
+                    const buffer = Buffer.from('\uFEFF' + listText, 'utf-8'); // বাংলা ফিক্স
                     await sock.sendMessage(remoteJid, { 
                         document: buffer, 
-                        mimetype: 'text/plain; charset=utf-8', // 🔥 charset বলে দেওয়া হলো
+                        mimetype: 'text/plain; charset=utf-8', 
                         fileName: 'Book_List.txt', 
                         caption: '📂 সব বইয়ের তালিকা।' 
                     });
                 } else {
-                    // ৫০ টার কম হলে সরাসরি মেসেজে দেখাবে
                     booksDatabase.forEach((book, index) => {
                         const displayName = book.category ? `${book.name} (${book.category})` : book.name;
                         listText += `*${index + 1}.* ${displayName}\n`;
@@ -289,7 +282,10 @@ async function connectToWhatsApp() {
                 await sock.sendMessage(remoteJid, { react: { text: "📜", key: msg.key } });
                 return;
             }
-            
+
+            // খ) মেনু/গ্রিটিংস চেক
+            const greetings = ["হ্যালো", "hi", "হাই", "hello", "salam", "আসসালামু আলাইকুম", "মেনু", "menu"];
+            if (greetings.some(w => msgLower.startsWith(w)) && incomingText.length < 20) {
                 const menuText = `📚 *আসসালামু আলাইকুম!* ইসলামিক লাইব্রেরিতে স্বাগতম।\n\n` +
                                  `🤖 *মাকতাবা বট*\n` +
                                  `🔍 *খুঁজতে:* বইয়ের নাম লিখুন।\n` +
@@ -302,7 +298,7 @@ async function connectToWhatsApp() {
                 return;
             }
 
-            // AI
+            // গ) AI রিপ্লাই (যদি উপরের কিছুই না হয়)
             await sock.sendPresenceUpdate('composing', remoteJid);
             const aiResponse = await getGeminiReply(incomingText, remoteJid);
             await sock.sendMessage(remoteJid, { text: aiResponse });
