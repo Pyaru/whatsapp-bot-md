@@ -260,40 +260,27 @@ async function connectToWhatsApp() {
         } else {
             // 🔥 ফিক্সড: বই না পেলে আগে লিস্ট/মেনু চেক করবে, তারপর AI
             
-            // ক) ফুল লিস্ট (নরমাল ভার্সন - আগের মতো)
+            // আপনার শিটের PDF লিংকটি এখানে বসান
+const PDF_LIST_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=456120804&single=true&output=pdf"; 
+
+// ... (বাকি কোড) ...
+
+            // ক) ফুল লিস্ট (PDF ভার্সন)
             if (msgLower.includes("তালিকা") || msgLower.includes("list")) {
-                let listText = "📚 *সকল বইয়ের তালিকা*\n\n";
+                
+                await sock.sendMessage(remoteJid, { text: "📚 *বইয়ের তালিকা তৈরি হচ্ছে...*" });
 
-                // ৫০ টার বেশি বই হলে ফাইল দেবে
-                if (booksDatabase.length > 50) {
-                    
-                    // ১. বইয়ের লিস্ট লুপ চালানো
-                    booksDatabase.forEach((book, index) => {
-                        const displayName = book.category ? `${book.name} (${book.category})` : book.name;
-                        listText += `${index + 1}. ${displayName}\n`;
-                    });
+                // সরাসরি PDF ফাইল পাঠানো
+                await sock.sendMessage(remoteJid, { 
+                    document: { url: PDF_LIST_URL }, // আপনার গুগল শিটের লিংক
+                    mimetype: 'application/pdf',
+                    fileName: 'Book_List.pdf',
+                    caption: '📂 আমাদের সকল বইয়ের তালিকা (PDF)।'
+                });
 
-                    // ২. সাধারণ বাফার (BOM বা ম্যাজিক কোড ছাড়া)
-                    const buffer = Buffer.from(listText, 'utf-8');
-
-                    // ৩. ফাইল সেন্ড করা
-                    await sock.sendMessage(remoteJid, { 
-                        document: buffer, 
-                        mimetype: 'text/plain', // শুধু text/plain রাখা হলো
-                        fileName: 'Book_List.txt', 
-                        caption: '📂 সব বইয়ের তালিকা।' 
-                    });
-                } else {
-                    // ৫০ টার কম হলে সরাসরি মেসেজে দেখাবে
-                    booksDatabase.forEach((book, index) => {
-                        const displayName = book.category ? `${book.name} (${book.category})` : book.name;
-                        listText += `*${index + 1}.* ${displayName}\n`;
-                    });
-                    await sock.sendMessage(remoteJid, { text: listText });
-                }
                 await sock.sendMessage(remoteJid, { react: { text: "📜", key: msg.key } });
                 return;
-            }
+    }
 
             // খ) মেনু/গ্রিটিংস চেক
             const greetings = ["হ্যালো", "hi", "হাই", "hello", "salam", "আসসালামু আলাইকুম", "মেনু", "menu"];
