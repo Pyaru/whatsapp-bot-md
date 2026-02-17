@@ -260,19 +260,31 @@ async function connectToWhatsApp() {
         } else {
             // 🔥 ফিক্সড: বই না পেলে আগে লিস্ট/মেনু চেক করবে, তারপর AI
             
-            // ক) ফুল লিস্ট
+            // ক) ফুল লিস্ট (নরমাল ভার্সন - আগের মতো)
             if (msgLower.includes("তালিকা") || msgLower.includes("list")) {
                 let listText = "📚 *সকল বইয়ের তালিকা*\n\n";
+
+                // ৫০ টার বেশি বই হলে ফাইল দেবে
                 if (booksDatabase.length > 50) {
-                    booksDatabase.forEach((book, index) => listText += `${index + 1}. ${book.name} ${book.category ? '('+book.category+')' : ''}\n`);
-                    const buffer = Buffer.from('\uFEFF' + listText, 'utf-8'); // বাংলা ফিক্স
+                    
+                    // ১. বইয়ের লিস্ট লুপ চালানো
+                    booksDatabase.forEach((book, index) => {
+                        const displayName = book.category ? `${book.name} (${book.category})` : book.name;
+                        listText += `${index + 1}. ${displayName}\n`;
+                    });
+
+                    // ২. সাধারণ বাফার (BOM বা ম্যাজিক কোড ছাড়া)
+                    const buffer = Buffer.from(listText, 'utf-8');
+
+                    // ৩. ফাইল সেন্ড করা
                     await sock.sendMessage(remoteJid, { 
                         document: buffer, 
-                        mimetype: 'text/plain; charset=utf-8', 
+                        mimetype: 'text/plain', // শুধু text/plain রাখা হলো
                         fileName: 'Book_List.txt', 
                         caption: '📂 সব বইয়ের তালিকা।' 
                     });
                 } else {
+                    // ৫০ টার কম হলে সরাসরি মেসেজে দেখাবে
                     booksDatabase.forEach((book, index) => {
                         const displayName = book.category ? `${book.name} (${book.category})` : book.name;
                         listText += `*${index + 1}.* ${displayName}\n`;
