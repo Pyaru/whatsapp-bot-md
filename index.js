@@ -133,7 +133,7 @@ async function connectToWhatsApp() {
         const now = Date.now();
         const lastMsgTime = rateLimitMap.get(remoteJid) || 0;
         if (now - lastMsgTime < 1000) return; 
-        rateLimitMap.set(remoteJid, now);
+        rateLiitMap.set(remoteJid, now);
 
         if (incomingText.length > 1) await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
 
@@ -152,71 +152,6 @@ async function connectToWhatsApp() {
             return;
         }
 
-       // =============================================
-        // 📢 সুপার সেফ ব্রডকাস্ট (১০ সেকেন্ড ডিলে)
-        // =============================================
-        if (msgLower.startsWith('broadcast')) {
-            // ১. এডমিন চেক
-            if (!remoteJid.includes(adminNumber)) {
-                return; 
-            }
-
-            const messageToSend = incomingText.replace(/broadcast/i, '').trim();
-            if (!messageToSend) {
-                await sock.sendMessage(remoteJid, { text: "❌ মেসেজ লিখুন। উদাহরণ: broadcast স্লামালিকুম" });
-                return;
-            }
-
-            // ২. এডমিনকে জানিয়ে দেওয়া
-            const totalUsers = allUsers.size;
-            const estimatedTime = Math.round((totalUsers * 10) / 60); // ১০ সেকেন্ড করে সময়
-            
-            await sock.sendMessage(remoteJid, { 
-                text: `🚀 *ব্রডকাস্ট শুরু হয়েছে!* (ব্যাকগ্রাউন্ডে)\n\n👥 টার্গেট: ${totalUsers} জন\n⏳ প্রতি মেসেজ গ্যাপ: ১০ সেকেন্ড\n🕒 আনুমানিক সময়: ${estimatedTime} মিনিট\n\n(আপনি এখন নিশ্চিন্তে অন্য কাজ করতে পারেন, শেষ হলে আমি রিপোর্ট দেব।)` 
-            });
-
-            // ৩. ব্যাকগ্রাউন্ড প্রসেস (অ্যাসিনক্রোনাস)
-            // এটি মেইন থ্রেড ব্লক করবে না
-            (async () => {
-                let successCount = 0;
-                let failCount = 0;
-                
-                // ইউজারদের অ্যারে বানানো
-                const usersArray = Array.from(allUsers);
-
-                for (let i = 0; i < usersArray.length; i++) {
-                    const userJid = usersArray[i];
-
-                    // গ্রুপ বা LID বাদ
-                    if (userJid.includes('@lid') || userJid.includes('g.us')) continue;
-
-                    try {
-                        // ১০ সেকেন্ড গ্যাপ (Super Safe Mode)
-                        await new Promise(r => setTimeout(r, 10000)); 
-                        
-                        await sock.sendMessage(userJid, { text: `📢 *নোটিফিকেশন:*\n\n${messageToSend}` });
-                        successCount++;
-                        
-                        // প্রতি ৫০ জন পর পর কনসোলে লগ দেখাবে (ডিব্যাগিং)
-                        if (successCount % 50 === 0) {
-                            console.log(`✅ Sent to ${successCount} users...`);
-                        }
-
-                    } catch (e) {
-                        failCount++;
-                        console.log(`Failed: ${userJid}`);
-                    }
-                }
-
-                // ৪. কাজ শেষ হলে এডমিনকে রিপোর্ট
-                await sock.sendMessage(remoteJid, { 
-                    text: `✅ *ব্রডকাস্ট মিশন সম্পন্ন!*\n\n🟢 সফল: ${successCount} জন\n🔴 ব্যর্থ: ${failCount} জন\n⏱️ মোট সময় লেগেছে: ${estimatedTime} মিনিট।` 
-                });
-
-            })(); // ফাংশন কল শেষ
-
-            return;
-                                   }
 
         if (['admin', 'এডমিন', 'help'].includes(msgLower)) {
             supportModeUsers.add(remoteJid);
