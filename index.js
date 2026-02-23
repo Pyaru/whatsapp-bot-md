@@ -101,7 +101,7 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, 
+        printQRInTerminal: false, 
         logger: pino({ level: "silent" }),
         browser: ["Ubuntu", "Chrome", "20.0.04"],
         syncFullHistory: false, 
@@ -109,13 +109,24 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update; // 🔥 qr যোগ করা হলো
+
+        // ১. যদি QR কোড আসে, তবে ছোট করে দেখাবে
+        if (qr) {
+            console.log("QR Code রিসিভ হয়েছে, ছোট করে দেখানো হচ্ছে...");
+            qrcode.generate(qr, { small: true }); 
+        }
+
+        // ২. কানেকশন লজিক (যেমন ছিল তেমনই থাকবে)
         if (connection === 'close') {
-            if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('❌ কানেকশন বন্ধ হয়েছে। পুনরায় চেষ্টা করা হচ্ছে...', shouldReconnect);
+            
+            if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
-            console.log('✅ WhatsApp কানেক্টেড!');
+            console.log('✅ WhatsApp সফলভাবে কানেক্টেড!');
         }
     });
 
