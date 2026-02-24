@@ -4,7 +4,7 @@ const express = require('express');
 const Fuse = require('fuse.js'); 
 const fetch = require('node-fetch'); 
 const fs = require('fs'); 
-const qrcode = require('qrcode-terminal'); 
+// const qrcode = require('qrcode-terminal'); 
 const app = express();
 
 const phoneNumber = "8801865760508"; 
@@ -111,23 +111,19 @@ async function connectToWhatsApp() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
+        // শুধু লিংক দেখাবে (কোনো লাইব্রেরি ছাড়া)
         if (qr) {
-            // 🔥 ম্যাজিক লিংক তৈরি (QR Code Image Link)
-            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`;
-            
-            console.log("\n==================================================");
-            console.log("✅ নিচের লিংকে ক্লিক করে QR কোড স্ক্যান করুন:");
-            console.log(qrImageUrl);
-            console.log("==================================================\n");
+            console.log("\n🔗 QR Code Link: " + `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}` + "\n");
         }
 
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('⚠️ সংযোগ বিচ্ছিন্ন। পুনরায় চেষ্টা করা হচ্ছে...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
-            console.log('✅ WhatsApp সফলভাবে কানেক্টেড!');
+            console.log('✅ আলহামদুলিল্লাহ! বট সফলভাবে কানেক্টেড এবং রানিং!');
         }
     });
 
