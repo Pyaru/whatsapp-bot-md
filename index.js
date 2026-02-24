@@ -109,19 +109,20 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update; // 🔥 qr যোগ করা হলো
+        const { connection, lastDisconnect, qr } = update;
 
-        // ১. যদি QR কোড আসে, তবে ছোট করে দেখাবে
         if (qr) {
-            console.log("QR Code রিসিভ হয়েছে, ছোট করে দেখানো হচ্ছে...");
-            qrcode.generate(qr, { small: true }); 
+            // 🔥 ম্যাজিক লিংক তৈরি (QR Code Image Link)
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`;
+            
+            console.log("\n==================================================");
+            console.log("✅ নিচের লিংকে ক্লিক করে QR কোড স্ক্যান করুন:");
+            console.log(qrImageUrl);
+            console.log("==================================================\n");
         }
 
-        // ২. কানেকশন লজিক (যেমন ছিল তেমনই থাকবে)
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('❌ কানেকশন বন্ধ হয়েছে। পুনরায় চেষ্টা করা হচ্ছে...', shouldReconnect);
-            
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
