@@ -141,7 +141,7 @@ async function connectToWhatsApp() {
         const now = Date.now();
         const lastMsgTime = rateLimitMap.get(remoteJid) || 0;
         if (now - lastMsgTime < 1000) return; 
-        rateLiitMap.set(remoteJid, now);
+        rateLimitMap.set(remoteJid, now);
 
         if (incomingText.length > 1) await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
 
