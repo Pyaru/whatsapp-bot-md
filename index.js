@@ -160,6 +160,53 @@ async function connectToWhatsApp() {
             return;
         }
 
+        // =============================================
+        // 📊 এডমিন স্ট্যাটস ড্যাশবোর্ড (NEW FEATURE)
+        // =============================================
+        if ((msgLower === 'stats' || msgLower === 'info') && remoteJid.includes(adminNumber)) {
+            
+            // ১. বেসিক তথ্য
+            const totalUsers = allUsers.size;
+            const totalBooks = booksDatabase.length;
+            
+            // ২. সার্ভার আপটাইম বের করা
+            const uptime = process.uptime();
+            const uptimeHours = Math.floor(uptime / 3600);
+            const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+
+            // ৩. মেমোরি ব্যবহার (RAM)
+            const memoryUsage = process.memoryUsage();
+            const ramUsed = Math.round(memoryUsage.rss / 1024 / 1024); // MB তে
+
+            // ৪. রিপোর্ট তৈরি
+            const reportText = `📊 *বট অ্যানালিটিক্স রিপোর্ট*\n\n` +
+                               `👥 *মোট ইউজার:* ${totalUsers} জন\n` +
+                               `📚 *মোট বই:* ${totalBooks} টি\n` +
+                               `⏳ *সার্ভার আপটাইম:* ${uptimeHours} ঘণ্টা ${uptimeMinutes} মিনিট\n` +
+                               `💾 *RAM ব্যবহার:* ${ramUsed} MB\n` +
+                               `📅 *তারিখ:* ${new Date().toLocaleDateString('bn-BD')}\n\n` +
+                               `💡 _টিপস: ব্যাকআপ নিতে 'backup' লিখুন।_`;
+
+            await sock.sendMessage(remoteJid, { text: reportText });
+            await sock.sendMessage(remoteJid, { react: { text: "📊", key: msg.key } });
+            return;
+        }
+
+        // =============================================
+        // 💾 ব্যাকআপ কমান্ড (ইউজার লিস্ট সেভ রাখার জন্য)
+        // =============================================
+        if (msgLower === 'backup' && remoteJid.includes(adminNumber)) {
+            const userListText = JSON.stringify(Array.from(allUsers), null, 2);
+            const buffer = Buffer.from(userListText, 'utf-8');
+            
+            await sock.sendMessage(remoteJid, { 
+                document: buffer, 
+                mimetype: 'application/json', 
+                fileName: `users_backup_${new Date().toISOString().split('T')[0]}.json`,
+                caption: `✅ *ইউজার ডাটাবেস ব্যাকআপ*\n\nমোট ইউজার: ${allUsers.size} জন।\n(ফাইলটি নিরাপদে সংরক্ষণ করুন)` 
+            });
+            return;
+        }
 
         if (['admin', 'এডমিন', 'help'].includes(msgLower)) {
             supportModeUsers.add(remoteJid);
