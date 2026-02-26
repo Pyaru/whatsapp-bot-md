@@ -61,3 +61,39 @@
 
             return;
         }
+
+
+// =============================================
+        // 📊 এডমিন স্ট্যাটস ড্যাশবোর্ড (অডিও সহ)
+        // =============================================
+        if ((msgLower === 'stats' || msgLower === 'info') && remoteJid.includes(adminNumber)) {
+            
+            // ১. বেসিক তথ্য
+            const totalUsers = allUsers.size;
+            const totalBooks = booksDatabase.length;
+            
+            // ২. অডিও কাউন্ট (যাদের audio লিংক আছে)
+            const totalAudio = booksDatabase.filter(book => book.audio && book.audio.length > 5).length;
+
+            // ৩. সার্ভার আপটাইম
+            const uptime = process.uptime();
+            const uptimeHours = Math.floor(uptime / 3600);
+            const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+
+            // ৪. মেমোরি ব্যবহার
+            const memoryUsage = process.memoryUsage();
+            const ramUsed = Math.round(memoryUsage.rss / 1024 / 1024);
+
+            // ৫. রিপোর্ট টেক্সট
+            const reportText = `📊 *বট অ্যানালিটিক্স রিপোর্ট*\n\n` +
+                               `👥 *মোট ইউজার:* ${totalUsers} জন\n` +
+                               `📚 *মোট বই:* ${totalBooks} টি\n` +
+                               `🎧 *মোট অডিও:* ${totalAudio} টি\n` +
+                               `⏳ *সার্ভার আপটাইম:* ${uptimeHours} ঘণ্টা ${uptimeMinutes} মিনিট\n` +
+                               `💾 *RAM ব্যবহার:* ${ramUsed} MB\n` +
+                               `📅 *তারিখ:* ${new Date().toLocaleDateString('bn-BD')}`;
+
+            await sock.sendMessage(remoteJid, { text: reportText });
+            await sock.sendMessage(remoteJid, { react: { text: "📊", key: msg.key } });
+            return;
+        }
