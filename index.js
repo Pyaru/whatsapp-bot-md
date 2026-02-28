@@ -7,6 +7,14 @@ const fs = require('fs');
 // const qrcode = require('qrcode-terminal'); 
 const app = express();
 
+// 🔥 ফোর্স ডিলিট কোড (একবার চালানোর জন্য)
+const sessionFolder = 'auth_info_baileys';
+if (fs.existsSync(sessionFolder)) {
+    console.log("⚠️ পুরনো সেশন ডিলিট করা হচ্ছে...");
+    fs.rmSync(sessionFolder, { recursive: true, force: true });
+    console.log("✅ সেশন ডিলিট সম্পন্ন! নতুন করে কানেক্ট করুন।");
+}
+
 const phoneNumber = "8801865760508"; 
 const adminNumber = "228088717828220"; // আপনার LID আইডি এখানে বসাবেন
 
