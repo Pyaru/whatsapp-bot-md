@@ -287,6 +287,57 @@ async function connectToWhatsApp() {
             return;
         }
 
+        // =============================================
+        // ℹ️ স্মার্ট ইনফো ও এবাউট সেকশন
+        // =============================================
+        const infoKeywords = ["info", "about", "বট সম্পর্কে", "বট তথ্য", "বট", "help"];
+        
+        if (infoKeywords.some(key => msgLower === key)) {
+            
+            // ১. লাইভ ডাটা ক্যালকুলেশন
+            const totalUsers = allUsers.size;
+            const totalBooks = booksDatabase.length;
+            const totalAudio = booksDatabase.filter(book => book.audio && book.audio.length > 5).length;
+
+            // ২. সুন্দর করে সাজানো মেসেজ
+            const aboutMessage = `🤖 *আমি মাকতাবা বট* - আপনার ইসলামিক সহকারী*\n` +
+                                 `━━━━━━━━━━━━━━━━━━━━\n` +
+                                 `✨ *আমাদের লক্ষ্য:* দাওয়াতে ইসলামীর প্রকাশিত কিতাবাদি অর্থাৎ ইলমে দ্বীন প্রযুক্তির মাধ্যমে সবার কাছে সহজে পৌঁছে দেওয়া।\n\n` +
+                                 
+                                 `📊 *এক নজরে বর্তমান অবস্থা:*\n` +
+                                 `👥 পাঠক সংখ্যা: ${totalUsers} জন+\n` +
+                                 `📚 সংগৃহীত বই: ${totalBooks} টি\n` +
+                                 `🎧 অডিও কালেকশন: ${totalAudio} টি\n\n` +
+
+                                 `🛠️ *ফিচারসমূহ:*\n` +
+                                 `✅ যেকোনো বইয়ের পিডিএফ ডাউনলোড\n` +
+                                 `✅ সাপ্তাহিক রিসালার অডিও ডাউনলোড\n` +
+                                 `✅ স্মার্ট সার্চ ইঞ্জিন (ভুল বানানেও খুঁজে দেয়)\n` +
+                                 `✅ নতুন বইয়ের আপডেট নোটিফিকেশন\n\n` +
+
+                                 `💡 *ব্যবহার বিধি:*\n` +
+                                 `- 🔍 *বই খুঁজতে:* দাওয়াতে ইসলামীর বইয়ের নাম লিখুন।\n` +
+                                 `- 📂 *সব বইয়ের নাম:* 'list' বা 'তালিকা' লিখুন।\n` +
+                                 `- 📝 *বই অনুরোধ:* 'request [বইয়ের নাম]' লিখুন।`+
+                                 `- ⁉️ *সাপোর্ট:* 'admin' লিখে মেসেজ দিন।`+
+                                 `- 🛑 *সার্চ বাতিল:* 'stop' লিখুন।`+
+                                 `- অডিও শুনতে বই সিলেক্ট করে 'audio' লিখুন।\n\n` +
+
+                                 `📩 *যোগাযোগ:* কোনো বই না পেলে বা পরামর্শ থাকলে 'request [আপনার কথা]' লিখে জানান।\n` +
+                                 `_সার্বিক তত্ত্বাবধানে: [মুহাম্মদ পেয়ারু আত্তারী]_`;
+
+            // ৩. লোগো বা থাম্বনেইল সহ পাঠানো (অপশনাল, লিংক থাকলে দেবেন)
+            // await sock.sendMessage(remoteJid, { 
+            //    image: { url: "https://your-image-link.com/logo.jpg" }, 
+            //    caption: aboutMessage 
+            // });
+
+            // সাধারণ টেক্সট মেসেজ
+            await sock.sendMessage(remoteJid, { text: aboutMessage });
+            await sock.sendMessage(remoteJid, { react: { text: "ℹ️", key: msg.key } });
+            return;
+        }
+
         // 🔥 ১. নতুন বই ফিচার (ফিক্সড - এখন নম্বর কাজ করবে)
         const newBookKeywords = ["new book", "নতুন বই", "আপডেট বই", "নতুন কি এসেছে"];
         if (newBookKeywords.some(key => msgLower.includes(key))) {
