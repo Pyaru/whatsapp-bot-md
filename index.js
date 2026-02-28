@@ -119,19 +119,25 @@ async function connectToWhatsApp() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        // শুধু লিংক দেখাবে (কোনো লাইব্রেরি ছাড়া)
         if (qr) {
             console.log("\n🔗 QR Code Link: " + `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}` + "\n");
         }
 
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('⚠️ সংযোগ বিচ্ছিন্ন। পুনরায় চেষ্টা করা হচ্ছে...', shouldReconnect);
-            if (shouldReconnect) {
-                connectToWhatsApp();
+            // কারণ চেক করা
+            const reason = lastDisconnect.error?.output?.statusCode;
+            console.log(`⚠️ কানেকশন বন্ধ! কারণ: ${reason}`);
+
+            // যদি লগআউট না হয়, তবে রিকানেক্ট করবে
+            if (reason !== DisconnectReason.loggedOut) {
+                console.log("🔄 ৫ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে...");
+                setTimeout(connectToWhatsApp, 5000); // ৫ সেকেন্ড ডিলে
+            } else {
+                console.log("❌ সেশন নষ্ট হয়ে গেছে। নতুন করে QR স্ক্যান করুন।");
+                // সেশন ফোল্ডার ডিলিট করার কোড এখানে দেওয়া যেতে পারে
             }
         } else if (connection === 'open') {
-            console.log('✅ আলহামদুলিল্লাহ! বট সফলভাবে কানেক্টেড এবং রানিং!');
+            console.log('✅ আলহামদুলিল্লাহ! বট কানেক্টেড।');
         }
     });
 
