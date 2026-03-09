@@ -115,6 +115,22 @@ async function connectToWhatsApp() {
         syncFullHistory: false, 
     });
 
+    // 🔥 সেফ মেসেজ সেন্ডার ফাংশন (Human-like Typing)
+const safeReply = async (jid, textObj) => {
+    // ১. প্রথমে 'Typing...' স্ট্যাটাস অন করবে
+    await sock.sendPresenceUpdate('composing', jid);
+    
+    // ২. মেসেজের সাইজ অনুযায়ী ২ থেকে ৪ সেকেন্ড অপেক্ষা করবে
+    const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // ৩. এরপর মেসেজ সেন্ড করবে
+    await sock.sendMessage(jid, textObj);
+    
+    // ৪. স্ট্যাটাস আবার নরমাল করবে
+    await sock.sendPresenceUpdate('paused', jid);
+};
+
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
