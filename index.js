@@ -181,15 +181,15 @@ const safeReply = async (jid, textObj) => {
 
         // এডমিন চেক (LID)
         if (msgLower === 'id' || msgLower === 'check') {
-            await sock.sendMessage(remoteJid, { text: `🕵️ ID: ${remoteJid}` });
+            await safeReply(remoteJid, { text: `🕵️ ID: ${remoteJid}` });
             return;
         }
 
         // আপডেট কমান্ড
         if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
-            await sock.sendMessage(remoteJid, { text: "🔄 আপডেট হচ্ছে..." });
+            await safeReply(remoteJid, { text: "🔄 আপডেট হচ্ছে..." });
             await loadBooksFromSheet();
-            await sock.sendMessage(remoteJid, { text: `✅ আপডেট সম্পন্ন! বই: ${booksDatabase.length}` });
+            await safeReply(remoteJid, { text: `✅ আপডেট সম্পন্ন! বই: ${booksDatabase.length}` });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
@@ -200,7 +200,7 @@ const safeReply = async (jid, textObj) => {
         if (msgLower.startsWith('broadcast') && remoteJid.includes(adminNumber)) {
             const messageToSend = incomingText.replace(/broadcast/i, '').trim();
             if (!messageToSend) {
-                await sock.sendMessage(remoteJid, { text: "❌ মেসেজ লিখুন। উদাহরণ: broadcast নতুন বই এসেছে!" });
+                await safeReply(remoteJid, { text: "❌ মেসেজ লিখুন। উদাহরণ: broadcast নতুন বই এসেছে!" });
                 return;
             }
 
@@ -288,7 +288,7 @@ const safeReply = async (jid, textObj) => {
                                `💾 *RAM ব্যবহার:* ${ramUsed} MB\n` +
                                `📅 *তারিখ:* ${new Date().toLocaleDateString('bn-BD')}`;
 
-            await sock.sendMessage(remoteJid, { text: reportText });
+            await safeReply(remoteJid, { text: reportText });
             await sock.sendMessage(remoteJid, { react: { text: "📊", key: msg.key } });
             return;
         }
@@ -296,19 +296,19 @@ const safeReply = async (jid, textObj) => {
         if (['admin', 'এডমিন', 'help'].includes(msgLower)) {
             supportModeUsers.add(remoteJid);
             userSearchSessions.delete(remoteJid);
-            await sock.sendMessage(remoteJid, { text: "🛑 সাপোর্ট মোড চালু হয়েছে, এডমিন শিঘ্রই আপনার সাথে যোগাযোগ করবেন, পুনরায় বট চালু করার জন্য bot, বা start লিখুন।" });
+            await safeReply(remoteJid, { text: "🛑 সাপোর্ট মোড চালু হয়েছে, এডমিন শিঘ্রই আপনার সাথে যোগাযোগ করবেন, পুনরায় বট চালু করার জন্য bot, বা start লিখুন।" });
             return;
         }
         if (['bot', 'বট', 'start'].includes(msgLower)) {
             supportModeUsers.delete(remoteJid);
-            await sock.sendMessage(remoteJid, { text: "✅ বট চালু হয়েছে!" });
+            await safeReply(remoteJid, { text: "✅ বট চালু হয়েছে!" });
         }
         if (supportModeUsers.has(remoteJid)) return;
 
         if (["stop", "বাদ", "clear"].includes(msgLower)) {
             userSearchSessions.delete(remoteJid);
             userSearchSessions.delete(remoteJid + "_audio"); // অডিও সেশন ক্লিয়ার
-            await sock.sendMessage(remoteJid, { text: "✅ আগের চার্চ লিস্ট ক্লিয়ার করা হয়েছে।" });
+            await safeReply(remoteJid, { text: "✅ আগের চার্চ লিস্ট ক্লিয়ার করা হয়েছে।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
@@ -316,7 +316,7 @@ const safeReply = async (jid, textObj) => {
         // রিকোয়েস্ট
         if (msgLower.startsWith("request") || msgLower.startsWith("চাই")) {
             await sock.sendMessage(adminNumber + "@s.whatsapp.net", { text: `🔔 Request: ${incomingText} \nFrom: ${remoteJid}` });
-            await sock.sendMessage(remoteJid, { text: "✅ এডমিনকে রিকোয়েস্ট পাঠানো হয়েছে।" });
+            await safeReply(remoteJid, { text: "✅ এডমিনকে রিকোয়েস্ট পাঠানো হয়েছে।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
@@ -362,7 +362,7 @@ const safeReply = async (jid, textObj) => {
             // });
 
             // সাধারণ টেক্সট মেসেজ
-            await sock.sendMessage(remoteJid, { text: aboutMessage });
+            await safeReply(remoteJid, { text: aboutMessage });
             await sock.sendMessage(remoteJid, { react: { text: "ℹ️", key: msg.key } });
             return;
         }
@@ -380,7 +380,7 @@ const safeReply = async (jid, textObj) => {
                 const displayName = book.category ? `${book.name} (${book.category})` : book.name;
                 updateMsg += `✨ ${index + 1}. ${displayName}\n`;
             });
-            await sock.sendMessage(remoteJid, { text: updateMsg });
+            await safeReply(remoteJid, { text: updateMsg });
             await sock.sendMessage(remoteJid, { react: { text: "🆕", key: msg.key } });
             return;
         }
@@ -408,7 +408,7 @@ const safeReply = async (jid, textObj) => {
             if (selectedBook) {
                 const displayName = selectedBook.category ? `${selectedBook.name} (${selectedBook.category})` : selectedBook.name;
                 
-                await sock.sendMessage(remoteJid, { text: `✅ *${displayName}* আপলোড হচ্ছে...` });
+                await safeReply(remoteJid, { text: `✅ *${displayName}* আপলোড হচ্ছে...` });
                 await sock.sendMessage(remoteJid, {
                     document: { url: selectedBook.link },
                     mimetype: 'application/pdf',
@@ -418,13 +418,13 @@ const safeReply = async (jid, textObj) => {
                 // 🎧 অডিও অফার
                 if (selectedBook.audio && selectedBook.audio.startsWith('http')) {
                     userSearchSessions.set(remoteJid + "_audio", selectedBook.audio);
-                    await sock.sendMessage(remoteJid, { text: `🎧 *অডিও সংস্করণ উপলব্ধ!* \n\nএই বইটির অডিও শুনতে চাইলে *'audio'* বা *'অডিও'* লিখে রিপ্লাই দিন।` });
+                    await safeReply(remoteJid, { text: `🎧 *অডিও সংস্করণ উপলব্ধ!* \n\nএই বইটির অডিও শুনতে চাইলে *'audio'* বা *'অডিও'* লিখে রিপ্লাই দিন।` });
                 }
 
                 await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
                 return;
             } else {
-                await sock.sendMessage(remoteJid, { text: "❌ সঠিক নম্বর দিন অথবা 'list' লিখুন।" });
+                await safeReply(remoteJid, { text: "❌ সঠিক নম্বর দিন অথবা 'list' লিখুন।" });
                 await sock.sendMessage(remoteJid, { react: { text: "❌", key: msg.key } });
                 return;
             }
@@ -434,11 +434,11 @@ const safeReply = async (jid, textObj) => {
         if (msgLower === 'audio' || msgLower === 'অডিও') {
             const audioLink = userSearchSessions.get(remoteJid + "_audio");
             if (audioLink) {
-                await sock.sendMessage(remoteJid, { text: "🎧 অডিও পাঠানো হচ্ছে..." });
+                await safeReply(remoteJid, { text: "🎧 অডিও পাঠানো হচ্ছে..." });
                 await sock.sendMessage(remoteJid, { audio: { url: audioLink }, mimetype: 'audio/mp4', ptt: false });
                 await sock.sendMessage(remoteJid, { react: { text: "🎶", key: msg.key } });
             } else {
-                await sock.sendMessage(remoteJid, { text: "⚠️ দুঃখিত! এই বইয়ের কোনো অডিও নেই।" });
+                await safeReply(remoteJid, { text: "⚠️ দুঃখিত! এই বইয়ের কোনো অডিও নেই।" });
             }
             return;
         }
@@ -465,7 +465,7 @@ const safeReply = async (jid, textObj) => {
                 const displayName = book.category ? `${book.name} (${book.category})` : book.name;
                 bookList += `*${i + 1}.* ${displayName}\n`;
             }
-            await sock.sendMessage(remoteJid, { text: bookList });
+            await safeReply(remoteJid, { text: bookList });
             await sock.sendMessage(remoteJid, { react: { text: "📚", key: msg.key } });
         } else {
             // 🔥 ৪. মেনু ও গ্রিটিংস (লিস্ট/তালিকা এবং সব বাংলা হ্যালো ফিক্সড)
@@ -499,7 +499,7 @@ const safeReply = async (jid, textObj) => {
                         await sock.sendMessage(remoteJid, { document: buffer, mimetype: 'text/plain', fileName: 'Book_List.txt', caption: '📂 সব বইয়ের তালিকা।' });
                     } else {
                         booksDatabase.forEach((book, index) => listText += `*${index + 1}.* ${book.name}\n`);
-                        await sock.sendMessage(remoteJid, { text: listText });
+                        await safeReply(remoteJid, { text: listText });
                     }
                     await sock.sendMessage(remoteJid, { react: { text: "📜", key: msg.key } });
                     return;
@@ -513,7 +513,7 @@ const safeReply = async (jid, textObj) => {
                                  `🆕 *নতুন:* 'নতুন বই' লিখুন।\n` +
                                  `📝 *অনুরোধ:* 'request [বই]' লিখুন।\n` +
                                  `⁉️ *সাপোর্ট:* 'admin' লিখুন।`;
-                await sock.sendMessage(remoteJid, { text: menuText });
+                await safeReply(remoteJid, { text: menuText });
                 await sock.sendMessage(remoteJid, { react: { text: "👋", key: msg.key } });
                 return;
             }
@@ -521,7 +521,7 @@ const safeReply = async (jid, textObj) => {
             // গ) AI রিপ্লাই
             await sock.sendPresenceUpdate('composing', remoteJid);
             const aiResponse = await getGeminiReply(incomingText, remoteJid);
-            await sock.sendMessage(remoteJid, { text: aiResponse });
+            await safeReply(remoteJid, { text: aiResponse });
             await sock.sendMessage(remoteJid, { react: { text: "🤖", key: msg.key } });
         }
     });
