@@ -133,6 +133,30 @@ const safeReply = async (jid, textObj) => {
 
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+
+        // ❌ QR Code এর লজিক এখান থেকে পুরোপুরি মুছে ফেলা হলো
+
+        if (connection === 'close') {
+            // কারণ চেক করা
+            const reason = lastDisconnect.error?.output?.statusCode;
+            console.log(`⚠️ কানেকশন বন্ধ! কারণ: ${reason}`);
+
+            // যদি লগআউট না হয়, তবে রিকানেক্ট করবে
+            if (reason !== DisconnectReason.loggedOut) {
+                console.log("🔄 ৫ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে...");
+                setTimeout(connectToWhatsApp, 5000); // ৫ সেকেন্ড ডিলে
+            } else {
+                console.log("❌ সেশন নষ্ট হয়ে গেছে বা লগআউট হয়েছে। দয়া করে টার্মিনাল থেকে 'rm -rf auth_info_baileys' কমান্ড দিয়ে ফোল্ডার ডিলিট করুন এবং নতুন করে Pairing Code নিন।");
+            }
+        } else if (connection === 'open') {
+            console.log('✅ আলহামদুলিল্লাহ! বট সফলভাবে কানেক্টেড এবং রানিং।');
+        }
+    });
+
+  /*
+    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
@@ -156,6 +180,7 @@ const safeReply = async (jid, textObj) => {
             console.log('✅ আলহামদুলিল্লাহ! বট কানেক্টেড।');
         }
     });
+    */
 
     sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
