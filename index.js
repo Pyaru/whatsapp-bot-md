@@ -131,28 +131,44 @@ const safeReply = async (jid, textObj) => {
     await sock.sendPresenceUpdate('paused', jid);
 };
 
+    // ==========================================
+// 🚀 কানেকশন (শুধুমাত্র Pairing Code)
+// ==========================================
+    // ✅ শুধু Pairing Code জেনারেট করবে
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                // 👇 এখানে আপনার বটের নম্বর দিন (কান্ট্রি কোড সহ, + ছাড়া)
+                const code = await sock.requestPairingCode("8801865760508"); 
+                console.log(`\n================================`);
+                console.log(`📞 Your Pairing Code: ${code}`);
+                console.log(`================================\n`);
+            } catch (err) {
+                console.log("❌ Pairing Code Error: ", err);
+            }
+        }, 3000);
+    }
+
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
 
-        // ❌ QR Code এর লজিক এখান থেকে পুরোপুরি মুছে ফেলা হলো
-
         if (connection === 'close') {
-            // কারণ চেক করা
             const reason = lastDisconnect.error?.output?.statusCode;
             console.log(`⚠️ কানেকশন বন্ধ! কারণ: ${reason}`);
 
-            // যদি লগআউট না হয়, তবে রিকানেক্ট করবে
             if (reason !== DisconnectReason.loggedOut) {
                 console.log("🔄 ৫ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে...");
-                setTimeout(connectToWhatsApp, 5000); // ৫ সেকেন্ড ডিলে
+                setTimeout(connectToWhatsApp, 5000);
             } else {
-                console.log("❌ সেশন নষ্ট হয়ে গেছে বা লগআউট হয়েছে। দয়া করে টার্মিনাল থেকে 'rm -rf auth_info_baileys' কমান্ড দিয়ে ফোল্ডার ডিলিট করুন এবং নতুন করে Pairing Code নিন।");
+                console.log("❌ সেশন নষ্ট হয়ে গেছে। দয়া করে টার্মিনাল থেকে 'rm -rf auth_info_baileys' কমান্ড দিয়ে ফোল্ডার ডিলিট করুন এবং নতুন করে রান করুন।");
             }
         } else if (connection === 'open') {
             console.log('✅ আলহামদুলিল্লাহ! বট সফলভাবে কানেক্টেড এবং রানিং।');
         }
     });
+
+    // ... (বাকি মেসেজ রিসিভ করার কোড যেমন আছে তেমনই থাকবে) ...
 
   /*
     sock.ev.on('creds.update', saveCreds);
