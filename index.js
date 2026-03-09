@@ -170,7 +170,11 @@ const safeReply = async (jid, textObj) => {
         saveUser(remoteJid);
         const now = Date.now();
         const lastMsgTime = rateLimitMap.get(remoteJid) || 0;
-        if (now - lastMsgTime < 1000) return; 
+        if (now - lastMsgTime < 3000) { 
+            // যদি কেউ খুব দ্রুত মেসেজ দেয়, তবে তাকে এই ওয়ার্নিং দিয়ে ইগনোর করবে
+            // await safeReply(remoteJid, { text: "⚠️ আপনি খুব দ্রুত মেসেজ দিচ্ছেন! দয়া করে একটু ধীরে লিখুন।" });
+            return; // বটের সার্ভার সেভ করার জন্য চুপ থাকাই ভালো
+        }
         rateLimitMap.set(remoteJid, now);
 
         if (incomingText.length > 1) await sock.sendMessage(remoteJid, { react: { text: "⏳", key: msg.key } });
