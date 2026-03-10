@@ -1,10 +1,10 @@
+require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const express = require('express');
 const Fuse = require('fuse.js'); 
 const fetch = require('node-fetch'); 
 const fs = require('fs'); 
-// const qrcode = require('qrcode-terminal'); 
 const app = express();
 
 // 🔥 ফোর্স ডিলিট কোড (একবার চালানোর জন্য)
@@ -15,22 +15,20 @@ if (fs.existsSync(sessionFolder)) {
     console.log("✅ সেশন ডিলিট সম্পন্ন! নতুন করে কানেক্ট করুন।");
 }
 
-const phoneNumber = "8801865760508"; 
-const adminNumber = "228088717828220"; // আপনার LID আইডি এখানে বসাবেন
+const phoneNumber = "8801865760508"; // আপনার বটের নম্বর (পেয়ারিং কোডের জন্য)
+const adminLID = "228088717828220";   // আপনার LID আইডি
+const adminPhone = "96897657655";     // আপনার পার্সোনাল নম্বর
 
 // ==========================================
-// 📊 কনফিগারেশন
+// 📊 ডাটাবেস কনফিগারেশন
 // ==========================================
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=1594849656&single=true&output=csv"; 
-
-// আপনার Sheet2 এর PDF লিংক (যদি থাকে বসাবেন, না থাকলে খালি রাখুন)
 const PDF_LIST_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=456120804&single=true&output=pdf"; 
 
 let booksDatabase = []; 
 const USER_DB_FILE = 'users.json'; 
 let allUsers = new Set(); 
 
-// ইউজার ডাটাবেস লোড
 if (!fs.existsSync(USER_DB_FILE)) {
     fs.writeFileSync(USER_DB_FILE, JSON.stringify([])); 
 }
@@ -48,7 +46,6 @@ function saveUser(jid) {
     }
 }
 
-// বই লোড (অডিও কলাম সহ - Column D)
 async function loadBooksFromSheet() {
     try {
         console.log("📥 বই লোড হচ্ছে...");
@@ -62,11 +59,11 @@ async function loadBooksFromSheet() {
                 const name = parts[0].trim().replace(/"/g, ''); 
                 const link = parts[1].trim();
                 const category = parts[2] ? parts[2].trim().replace(/"/g, '') : "";
-                // ৪র্থ কলামে অডিও লিংক (যদি থাকে)
                 const audio = parts[3] ? parts[3].trim() : ""; 
+                const topics = parts[4] ? parts[4].trim().replace(/"/g, '') : ""; 
                 
                 if (link.startsWith('http')) {
-                    newBooks.push({ name, link, category, audio });
+                    newBooks.push({ name, link, category, audio, topics });
                 }
             }
         });
@@ -76,16 +73,16 @@ async function loadBooksFromSheet() {
     } catch (error) { console.error("❌ বই লোড এরর:", error); }
 }
 
-// ==========================================
-// 🛠️ মেইন লজিক
-// ==========================================
 const supportModeUsers = new Set();
 const userSearchSessions = new Map();
+const sessionTimers = new Map(); 
+const SESSION_TIMEOUT = 30 * 60 * 1000; 
 const rateLimitMap = new Map(); 
+
 const { extractBookKeyword, getGeminiReply } = require('./ai'); 
 
 const fuseOptions = {
-    keys: ['name'],
+    keys: ['name', 'topics'],
     threshold: 0.4,
     includeScore: true,
     ignoreLocation: true,
@@ -102,47 +99,34 @@ const cleanUserQuery = (text) => {
 };
 
 // ==========================================
-// 🚀 কানেকশন (Clean & Safe Version)
+// 🚀 কানেকশন লজিক
 // ==========================================
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // ❌ এটি false থাকবে, কারণ আমরা লিংক ব্যবহার করব
+        printQRInTerminal: false, // পেয়ারিং কোডের জন্য false করা হলো
         logger: pino({ level: "silent" }),
-        // 🔥 ১০০% সেফ ব্রাউজার সেটিং
         browser: Browsers.ubuntu('Chrome'), 
         syncFullHistory: false, 
         generateHighQualityLinkPreview: false,
     });
 
     // 🔥 সেফ মেসেজ সেন্ডার ফাংশন (Human-like Typing)
-const safeReply = async (jid, textObj) => {
-    // ১. প্রথমে 'Typing...' স্ট্যাটাস অন করবে
-    await sock.sendPresenceUpdate('composing', jid);
-    
-    // ২. মেসেজের সাইজ অনুযায়ী ২ থেকে ৪ সেকেন্ড অপেক্ষা করবে
-    const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
-    await new Promise(resolve => setTimeout(resolve, delay));
-    
-    // ৩. এরপর মেসেজ সেন্ড করবে
-    await sock.sendMessage(jid, textObj);
-    
-    // ৪. স্ট্যাটাস আবার নরমাল করবে
-    await sock.sendPresenceUpdate('paused', jid);
-};
+    const safeReply = async (jid, textObj) => {
+        await sock.sendPresenceUpdate('composing', jid);
+        const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        await sock.sendMessage(jid, textObj);
+        await sock.sendPresenceUpdate('paused', jid);
+    };
 
-   /*
-    // ==========================================
-// 🚀 কানেকশন (শুধুমাত্র Pairing Code)
-// ==========================================
-    // ✅ শুধু Pairing Code জেনারেট করবে
+    // ✅ Pairing Code জেনারেট করার লজিক (চালু করা হলো)
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
-                // 👇 এখানে আপনার বটের নম্বর দিন (কান্ট্রি কোড সহ, + ছাড়া)
-                const code = await sock.requestPairingCode("8801865760508"); 
+                const code = await sock.requestPairingCode(phoneNumber); 
                 console.log(`\n================================`);
                 console.log(`📞 Your Pairing Code: ${code}`);
                 console.log(`================================\n`);
@@ -151,21 +135,11 @@ const safeReply = async (jid, textObj) => {
             }
         }, 5000);
     }
-    */
 
-   // ✅ শুধুমাত্র একবার ইভেন্ট লিসেনার দেওয়া হলো
     sock.ev.on('creds.update', saveCreds);
     
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        // QR কোড লিংক জেনারেটর
-        if (qr) {
-            console.log("\n=============================================");
-            console.log("🔗 নিচের লিংকে ক্লিক করে QR কোড স্ক্যান করুন:");
-            console.log(`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`);
-            console.log("=============================================\n");
-        }
+        const { connection, lastDisconnect } = update;
 
         if (connection === 'close') {
             const reason = lastDisconnect.error?.output?.statusCode;
@@ -186,9 +160,6 @@ const safeReply = async (jid, textObj) => {
     // 📩 মেসেজ রিসিভ করার লজিক
     // ==========================================
     sock.ev.on('messages.upsert', async m => {
-        // ... (আপনার আগের মেসেজ রিসিভ করার সব কোড এখানে থাকবে) ...
-
-    sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
@@ -199,11 +170,11 @@ const safeReply = async (jid, textObj) => {
         if (!incomingText) return; 
 
         saveUser(remoteJid);
+        
+        // Anti-Spam
         const now = Date.now();
         const lastMsgTime = rateLimitMap.get(remoteJid) || 0;
         if (now - lastMsgTime < 3000) { 
-            // যদি কেউ খুব দ্রুত মেসেজ দেয়, তবে তাকে এই ওয়ার্নিং দিয়ে ইগনোর করবে
-            // await safeReply(remoteJid, { text: "⚠️ আপনি খুব দ্রুত মেসেজ দিচ্ছেন! দয়া করে একটু ধীরে লিখুন।" });
             return; // বটের সার্ভার সেভ করার জন্য চুপ থাকাই ভালো
         }
         rateLimitMap.set(remoteJid, now);
@@ -217,7 +188,7 @@ const safeReply = async (jid, textObj) => {
         }
 
         // আপডেট কমান্ড
-        if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminNumber)) {
+        if ((msgLower === 'update' || msgLower === 'refresh') && remoteJid.includes(adminLID)) {
             await safeReply(remoteJid, { text: "🔄 আপডেট হচ্ছে..." });
             await loadBooksFromSheet();
             await safeReply(remoteJid, { text: `✅ আপডেট সম্পন্ন! বই: ${booksDatabase.length}` });
@@ -228,22 +199,20 @@ const safeReply = async (jid, textObj) => {
         // =============================================
         // 🛡️ আল্ট্রা সেফ ব্রডকাস্ট (Anti-Ban System)
         // =============================================
-        if (msgLower.startsWith('broadcast') && remoteJid.includes(adminNumber)) {
+        if (msgLower.startsWith('broadcast') && remoteJid.includes(adminLID)) {
             const messageToSend = incomingText.replace(/broadcast/i, '').trim();
             if (!messageToSend) {
                 await safeReply(remoteJid, { text: "❌ মেসেজ লিখুন। উদাহরণ: broadcast নতুন বই এসেছে!" });
                 return;
             }
 
-            // ১. সেফটি কনফিগারেশন
-            const BATCH_SIZE = 40; // একবারে ৪০ জন
-            const BATCH_DELAY = 15 * 60 * 1000; // ১৫ মিনিট বিরতি
-            const DAILY_LIMIT = 200; // দিনে সর্বোচ্চ ২০০ জন
+            const BATCH_SIZE = 40; 
+            const BATCH_DELAY = 15 * 60 * 1000; 
+            const DAILY_LIMIT = 200; 
             
             const totalUsers = Array.from(allUsers);
-            const targetUsers = totalUsers.filter(u => !u.includes('@lid') && !u.includes('g.us')); // লিড ও গ্রুপ বাদ
+            const targetUsers = totalUsers.filter(u => !u.includes('@lid') && !u.includes('g.us')); 
             
-            // আজকের লিমিট চেক
             const todayCount = targetUsers.slice(0, DAILY_LIMIT); 
             const remaining = targetUsers.length - DAILY_LIMIT;
 
@@ -251,66 +220,49 @@ const safeReply = async (jid, textObj) => {
                 text: `🛡️ *সেফ ব্রডকাস্ট চালু হয়েছে!*\n\n👥 মোট টার্গেট: ${targetUsers.length} জন\n📅 আজ পাঠানো হবে: ${todayCount.length} জন\n⏳ বাকি থাকবে: ${remaining > 0 ? remaining : 0} জন (আগামীকাল যাবে)\n\n⚙️ স্ট্র্যাটেজি:\n- প্রতি মেসেজে ১০-৩০ সেকেন্ড র‍্যান্ডম গ্যাপ\n- প্রতি ৪০ জন পর ১৫ মিনিট বিরতি\n\n(ব্যাকগ্রাউন্ডে কাজ চলছে, আপনি নিশ্চিন্ত থাকুন...)` 
             });
 
-            // ২. ব্যাকগ্রাউন্ড প্রসেস (স্মার্ট লুপ)
             (async () => {
                 let successCount = 0;
                 let failCount = 0;
                 
                 for (let i = 0; i < todayCount.length; i++) {
                     const userJid = todayCount[i];
-
                     try {
-                        // 🎲 র‍্যান্ডম ডিলে (১০ থেকে ৩০ সেকেন্ড)
                         const randomDelay = Math.floor(Math.random() * (30000 - 10000 + 1)) + 10000;
                         await new Promise(r => setTimeout(r, randomDelay));
                         
                         await sock.sendMessage(userJid, { text: `📢 *নোটিফিকেশন:*\n\n${messageToSend}` });
                         successCount++;
 
-                        // ⏸️ ৪০ জন পর ১৫ মিনিট বিরতি
                         if ((i + 1) % BATCH_SIZE === 0) {
                             console.log(`⏸️ ${i + 1} জন সম্পন্ন। ১৫ মিনিট বিরতি চলছে...`);
                             await new Promise(r => setTimeout(r, BATCH_DELAY));
                         }
-
                     } catch (e) {
                         failCount++;
                         console.log(`Failed: ${userJid}`);
                     }
                 }
 
-                // ৩. রিপোর্ট
                 await sock.sendMessage(remoteJid, { 
-                    text: `✅ *আজকের ব্রডকাস্ট সম্পন্ন!*\n\n🟢 সফল: ${successCount} জন\n🔴 ব্যর্থ: ${failCount} জন\n\n(বাকিদের কাল পাঠানো হবে ইনশাআল্লাহ)` 
+                    text: `✅ *আজকের ব্রডকাস্ট সম্পন্ন!*\n\n🟢 সফল: ${successCount} জন\n🔴 ব্যর্থ: ${failCount} জন` 
                 });
-
-            })(); // ফাংশন শেষ
-
+            })(); 
             return;
         }
 
         // =============================================
-        // 📊 এডমিন স্ট্যাটস ড্যাশবোর্ড (অডিও সহ)
+        // 📊 এডমিন স্ট্যাটস ড্যাশবোর্ড
         // =============================================
-        if ((msgLower === 'stats' || msgLower === 'info') && remoteJid.includes(adminNumber)) {
-            
-            // ১. বেসিক তথ্য
+        if ((msgLower === 'stats' || msgLower === 'info') && remoteJid.includes(adminLID)) {
             const totalUsers = allUsers.size;
             const totalBooks = booksDatabase.length;
-            
-            // ২. অডিও কাউন্ট (যাদের audio লিংক আছে)
             const totalAudio = booksDatabase.filter(book => book.audio && book.audio.length > 5).length;
-
-            // ৩. সার্ভার আপটাইম
             const uptime = process.uptime();
             const uptimeHours = Math.floor(uptime / 3600);
             const uptimeMinutes = Math.floor((uptime % 3600) / 60);
-
-            // ৪. মেমোরি ব্যবহার
             const memoryUsage = process.memoryUsage();
             const ramUsed = Math.round(memoryUsage.rss / 1024 / 1024);
 
-            // ৫. রিপোর্ট টেক্সট
             const reportText = `📊 *বট অ্যানালিটিক্স রিপোর্ট*\n\n` +
                                `👥 *মোট ইউজার:* ${totalUsers} জন\n` +
                                `📚 *মোট বই:* ${totalBooks} টি\n` +
@@ -338,72 +290,52 @@ const safeReply = async (jid, textObj) => {
 
         if (["stop", "বাদ", "clear"].includes(msgLower)) {
             userSearchSessions.delete(remoteJid);
-            userSearchSessions.delete(remoteJid + "_audio"); // অডিও সেশন ক্লিয়ার
-            await safeReply(remoteJid, { text: "✅ আগের চার্চ লিস্ট ক্লিয়ার করা হয়েছে।" });
+            userSearchSessions.delete(remoteJid + "_audio"); 
+            await safeReply(remoteJid, { text: "✅ আগের সার্চ লিস্ট ক্লিয়ার করা হয়েছে।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
 
-        // রিকোয়েস্ট
         if (msgLower.startsWith("request") || msgLower.startsWith("চাই")) {
-            await sock.sendMessage(adminNumber + "@s.whatsapp.net", { text: `🔔 Request: ${incomingText} \nFrom: ${remoteJid}` });
+            await sock.sendMessage(adminPhone + "@s.whatsapp.net", { text: `🔔 Request: ${incomingText} \nFrom: ${remoteJid}` });
             await safeReply(remoteJid, { text: "✅ এডমিনকে রিকোয়েস্ট পাঠানো হয়েছে।" });
             await sock.sendMessage(remoteJid, { react: { text: "✅", key: msg.key } });
             return;
         }
 
-        // =============================================
-        // ℹ️ স্মার্ট ইনফো ও এবাউট সেকশন
-        // =============================================
-        const infoKeywords = ["info", "about", "বট সম্পর্কে", "বট তথ্য", "বট", "help"];
-        
+        // ℹ️ স্মার্ট ইনফো
+        const infoKeywords = ["about", "বট সম্পর্কে", "বট তথ্য", "বট"];
         if (infoKeywords.some(key => msgLower === key)) {
-            
-            // ১. লাইভ ডাটা ক্যালকুলেশন
             const totalUsers = allUsers.size;
             const totalBooks = booksDatabase.length;
             const totalAudio = booksDatabase.filter(book => book.audio && book.audio.length > 5).length;
 
-            // ২. সুন্দর করে সাজানো মেসেজ
             const aboutMessage = `🤖 *আমি মাকতাবা বট - আপনার বট সহকারী*\n` +
                                  `━━━━━━━━━━━━━━━━━━━━\n` +
                                  `✨ *আমাদের লক্ষ্য:* প্রযুক্তির মাধ্যমে ইলমে দ্বীন সবার কাছে সহজে পৌঁছে দেওয়া।\n\n` +
-                                 
                                  `📊 *এক নজরে বর্তমান অবস্থা:*\n` +
                                  `👥 পাঠক সংখ্যা: ${totalUsers} জন+\n` +
                                  `📚 সংগৃহীত বই: ${totalBooks} টি\n` +
                                  `🎧 অডিও কালেকশন: ${totalAudio} টি\n\n` +
-
                                  `💡 *ব্যবহার বিধি:*\n` +
                                  `- 🔍 *বই খুঁজতে:* দাওয়াতে ইসলামীর বইয়ের নাম লিখুন।\n` +
                                  `- 📂 *সব বইয়ের নাম:* 'list' লিখুন।\n` +
                                  `- 📝 *বই অনুরোধ:* 'request [বইয়ের নাম]' লিখুন।\n` +
-                                 `- ⁉️ *সাপোর্ট:* 'admin' লিখে মেসেজ দিন।\n` +
+                                 `- ⁉️ *সাপোর্ট:* 'admin' লিখে মেসেজ দিন。\n` +
                                  `- 🛑 *আগের সার্চ বাতিল:* 'stop' লিখুন।\n` +
                                  `- 🎧 *অডিও শুনতে* বই সিলেক্ট করে 'audio' লিখুন।\n\n` +
-
                                  `📩 *যোগাযোগ:* কোনো বই না পেলে বা পরামর্শ থাকলে 'request [আপনার কথা]' লিখে জানান।\n\n` +
-                
                                  `_সার্বিক তত্ত্বাবধানে: [মুহাম্মদ পেয়ারু আত্তারী]_`;
 
-            // ৩. লোগো বা থাম্বনেইল সহ পাঠানো (অপশনাল, লিংক থাকলে দেবেন)
-            // await sock.sendMessage(remoteJid, { 
-            //    image: { url: "https://your-image-link.com/logo.jpg" }, 
-            //    caption: aboutMessage 
-            // });
-
-            // সাধারণ টেক্সট মেসেজ
             await safeReply(remoteJid, { text: aboutMessage });
             await sock.sendMessage(remoteJid, { react: { text: "ℹ️", key: msg.key } });
             return;
         }
 
-        // 🔥 ১. নতুন বই ফিচার (ফিক্সড - এখন নম্বর কাজ করবে)
+        // নতুন বই ফিচার
         const newBookKeywords = ["new book", "নতুন বই", "আপডেট বই", "নতুন কি এসেছে"];
         if (newBookKeywords.some(key => msgLower.includes(key))) {
             const recentBooks = booksDatabase.slice(-10).reverse();
-            
-            // 💡 ফিক্স: নতুন বইগুলো মেমোরিতে সেভ করা হলো
             userSearchSessions.set(remoteJid, recentBooks);
 
             let updateMsg = "🎉 *নতুন ১০টি বই:*\n(বই পেতে নম্বর লিখে রিপ্লাই দিন)\n\n";
@@ -416,7 +348,7 @@ const safeReply = async (jid, textObj) => {
             return;
         }
 
-        // 🔥 ২. বই সিলেকশন হ্যান্ডলিং (অডিও সহ)
+        // বই সিলেকশন
         const convertedDigits = toEnglishDigits(incomingText);
         const isOnlyNumber = /^[0-9]+$/.test(convertedDigits);
 
@@ -424,15 +356,12 @@ const safeReply = async (jid, textObj) => {
             const selectedIndex = parseInt(convertedDigits) - 1;
             let selectedBook = null;
 
-            // সার্চ সেশন চেক (নতুন বই বা সার্চ রেজাল্ট)
             if (userSearchSessions.has(remoteJid)) {
                 const pendingBooks = userSearchSessions.get(remoteJid);
                 if (selectedIndex >= 0 && selectedIndex < pendingBooks.length) {
                     selectedBook = pendingBooks[selectedIndex];
                 }
-            }
-            // মেইন তালিকা চেক
-            else if (selectedIndex >= 0 && selectedIndex < booksDatabase.length) {
+            } else if (selectedIndex >= 0 && selectedIndex < booksDatabase.length) {
                 selectedBook = booksDatabase[selectedIndex];
             }
 
@@ -446,7 +375,6 @@ const safeReply = async (jid, textObj) => {
                     fileName: `${selectedBook.name}.pdf`
                 });
 
-                // 🎧 অডিও অফার
                 if (selectedBook.audio && selectedBook.audio.startsWith('http')) {
                     userSearchSessions.set(remoteJid + "_audio", selectedBook.audio);
                     await safeReply(remoteJid, { text: `🎧 *অডিও সংস্করণ উপলব্ধ!* \n\nএই বইটির অডিও শুনতে চাইলে *'audio'* বা *'অডিও'* লিখে রিপ্লাই দিন।` });
@@ -461,7 +389,6 @@ const safeReply = async (jid, textObj) => {
             }
         }
 
-        // 🔥 ৩. অডিও কমান্ড হ্যান্ডলিং
         if (msgLower === 'audio' || msgLower === 'অডিও') {
             const audioLink = userSearchSessions.get(remoteJid + "_audio");
             if (audioLink) {
@@ -499,15 +426,11 @@ const safeReply = async (jid, textObj) => {
             await safeReply(remoteJid, { text: bookList });
             await sock.sendMessage(remoteJid, { react: { text: "📚", key: msg.key } });
         } else {
-            // 🔥 ৪. মেনু ও গ্রিটিংস (লিস্ট/তালিকা এবং সব বাংলা হ্যালো ফিক্সড)
             const greetings = ["hi", "hello", "salam", "আসসালামু আলাইকুম", "সালাম", "হাই", "হ্যালো", "মেনু", "menu", "list", "তালিকা"];
             
             if (greetings.some(w => msgLower.startsWith(w)) && incomingText.length < 25) {
                 
-                // ক) তালিকা বা লিস্ট
                 if (msgLower.includes("list") || msgLower.includes("তালিকা")) {
-                    
-                    // যদি PDF লিংক থাকে তবে PDF দেবে
                     if (PDF_LIST_URL && PDF_LIST_URL.length > 10) {
                         await sock.sendMessage(remoteJid, { 
                             document: { url: PDF_LIST_URL },
@@ -519,7 +442,6 @@ const safeReply = async (jid, textObj) => {
                         return;
                     }
 
-                    // না থাকলে টেক্সট ফাইল (নরমাল)
                     let listText = "📚 *সকল বইয়ের তালিকা*\n\n";
                     if (booksDatabase.length > 50) {
                         booksDatabase.forEach((book, index) => {
@@ -536,7 +458,6 @@ const safeReply = async (jid, textObj) => {
                     return;
                 }
 
-                // খ) মেইন মেনু
                 const menuText = `📚 *আসসালামু আলাইকুম!* ইসলামিক লাইব্রেরিতে স্বাগতম।\n\n` +
                                  `🤖 *মাকতাবা বট*\n` +
                                  `🔍 *খুঁজতে:* বইয়ের নাম লিখুন।\n` +
@@ -549,7 +470,6 @@ const safeReply = async (jid, textObj) => {
                 return;
             }
 
-            // গ) AI রিপ্লাই
             await sock.sendPresenceUpdate('composing', remoteJid);
             const aiResponse = await getGeminiReply(incomingText, remoteJid);
             await safeReply(remoteJid, { text: aiResponse });
