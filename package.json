@@ -1,14 +1,14 @@
 {
     "name": "whatsapp-bot-md",
     "version": "1.0.0",
-    "description": "WhatsApp Bot running on Render",
+    "description": "WhatsApp Bot running on termux",
     "main": "index.js",
     "scripts": {
         "start": "node index.js"
     },
     "engines": {
-        "node": "20.x"
-    },
+    "node": ">=20.0.0"
+  },
     "keywords": [
         "whatsapp",
         "bot",
