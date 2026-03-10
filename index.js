@@ -108,7 +108,7 @@ async function connectToWhatsApp() {
         auth: state,
         printQRInTerminal: false, // টার্মিনালে ভাঙা QR দেখাবে না
         logger: pino({ level: "silent" }),
-        browser: Browsers.macOS('Desktop'), // ম্যাক ওএস সবচেয়ে সেফ
+        browser: ["Ubuntu", "Chrome", "110.0.5481.100"], // ম্যাক ওএস সবচেয়ে সেফ
         syncFullHistory: false, 
         generateHighQualityLinkPreview: false,
     });
