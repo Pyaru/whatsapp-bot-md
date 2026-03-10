@@ -99,21 +99,22 @@ const cleanUserQuery = (text) => {
 };
 
 // ==========================================
-// 🚀 কানেকশন লজিক
+// 🚀 কানেকশন (Magic QR Link Version)
 // ==========================================
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // পেয়ারিং কোডের জন্য false করা হলো
+        printQRInTerminal: false, // টার্মিনালে ভাঙা QR দেখাবে না
         logger: pino({ level: "silent" }),
-        browser: Browsers.ubuntu('Chrome'), 
+        browser: Browsers.macOS('Desktop'), // ম্যাক ওএস সবচেয়ে সেফ
         syncFullHistory: false, 
         generateHighQualityLinkPreview: false,
     });
 
-    // 🔥 সেফ মেসেজ সেন্ডার ফাংশন (Human-like Typing)
+    // ❌ Pairing Code এর অংশটুকু (setTimeout...) পুরোপুরি মুছে ফেলুন!
+
     const safeReply = async (jid, textObj) => {
         await sock.sendPresenceUpdate('composing', jid);
         const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
@@ -122,24 +123,18 @@ async function connectToWhatsApp() {
         await sock.sendPresenceUpdate('paused', jid);
     };
 
-    // ✅ Pairing Code জেনারেট করার লজিক (চালু করা হলো)
-    if (!sock.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(phoneNumber); 
-                console.log(`\n================================`);
-                console.log(`📞 Your Pairing Code: ${code}`);
-                console.log(`================================\n`);
-            } catch (err) {
-                console.log("❌ Pairing Code Error: ", err);
-            }
-        }, 5000);
-    }
-
     sock.ev.on('creds.update', saveCreds);
     
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+
+        // ✅ ম্যাজিক QR লিংক তৈরি
+        if (qr) {
+            console.log("\n=============================================");
+            console.log("🔗 নিচের লিংকে ক্লিক করে QR কোডটি বের করুন এবং অন্য ফোন দিয়ে স্ক্যান করুন:");
+            console.log(`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`);
+            console.log("=============================================\n");
+        }
 
         if (connection === 'close') {
             const reason = lastDisconnect.error?.output?.statusCode;
