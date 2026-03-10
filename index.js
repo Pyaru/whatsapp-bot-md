@@ -111,9 +111,14 @@ async function connectToWhatsApp() {
         auth: state,
         printQRInTerminal: false, 
         logger: pino({ level: "silent" }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        // 🔥 ম্যাজিক: হোয়াটসঅ্যাপকে বোকা বানানোর জন্য Chrome এর লেটেস্ট ভার্সন
+        browser: ["Mac OS", "Chrome", "122.0.6261.112"], 
+        
         syncFullHistory: false, 
+        generateHighQualityLinkPreview: false, // এটি ফলস থাকলে কানেকশন ফাস্ট হয়
     });
+
+    // ... (বাকি পেয়ারিং কোডের লজিক আগের মতোই থাকবে)
 
     // 🔥 সেফ মেসেজ সেন্ডার ফাংশন (Human-like Typing)
 const safeReply = async (jid, textObj) => {
