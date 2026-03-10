@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const express = require('express');
 const Fuse = require('fuse.js'); 
@@ -112,8 +112,7 @@ async function connectToWhatsApp() {
         printQRInTerminal: false, 
         logger: pino({ level: "silent" }),
         // 🔥 ম্যাজিক: হোয়াটসঅ্যাপকে বোকা বানানোর জন্য Chrome এর লেটেস্ট ভার্সন
-        browser: ["Mac OS", "Chrome", "122.0.6261.112"], 
-        
+        browser: Browsers.macOS('Desktop'), 
         syncFullHistory: false, 
         generateHighQualityLinkPreview: false, // এটি ফলস থাকলে কানেকশন ফাস্ট হয়
     });
@@ -151,7 +150,7 @@ const safeReply = async (jid, textObj) => {
             } catch (err) {
                 console.log("❌ Pairing Code Error: ", err);
             }
-        }, 3000);
+        }, 5000);
     }
 
     sock.ev.on('creds.update', saveCreds);
