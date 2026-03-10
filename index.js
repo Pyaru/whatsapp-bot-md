@@ -102,22 +102,20 @@ const cleanUserQuery = (text) => {
 };
 
 // ==========================================
-// 🚀 কানেকশন
+// 🚀 কানেকশন (Clean & Safe Version)
 // ==========================================
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, 
+        printQRInTerminal: false, // ❌ এটি false থাকবে, কারণ আমরা লিংক ব্যবহার করব
         logger: pino({ level: "silent" }),
-        // 🔥 ম্যাজিক: হোয়াটসঅ্যাপকে বোকা বানানোর জন্য Chrome এর লেটেস্ট ভার্সন
-        browser: Browsers.macOS('Desktop'), 
+        // 🔥 ১০০% সেফ ব্রাউজার সেটিং
+        browser: Browsers.ubuntu('Chrome'), 
         syncFullHistory: false, 
-        generateHighQualityLinkPreview: false, // এটি ফলস থাকলে কানেকশন ফাস্ট হয়
+        generateHighQualityLinkPreview: false,
     });
-
-    // ... (বাকি পেয়ারিং কোডের লজিক আগের মতোই থাকবে)
 
     // 🔥 সেফ মেসেজ সেন্ডার ফাংশন (Human-like Typing)
 const safeReply = async (jid, textObj) => {
@@ -155,9 +153,19 @@ const safeReply = async (jid, textObj) => {
     }
     */
 
+   // ✅ শুধুমাত্র একবার ইভেন্ট লিসেনার দেওয়া হলো
     sock.ev.on('creds.update', saveCreds);
+    
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+
+        // QR কোড লিংক জেনারেটর
+        if (qr) {
+            console.log("\n=============================================");
+            console.log("🔗 নিচের লিংকে ক্লিক করে QR কোড স্ক্যান করুন:");
+            console.log(`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`);
+            console.log("=============================================\n");
+        }
 
         if (connection === 'close') {
             const reason = lastDisconnect.error?.output?.statusCode;
@@ -167,40 +175,18 @@ const safeReply = async (jid, textObj) => {
                 console.log("🔄 ৫ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে...");
                 setTimeout(connectToWhatsApp, 5000);
             } else {
-                console.log("❌ সেশন নষ্ট হয়ে গেছে। দয়া করে টার্মিনাল থেকে 'rm -rf auth_info_baileys' কমান্ড দিয়ে ফোল্ডার ডিলিট করুন এবং নতুন করে রান করুন।");
+                console.log("❌ সেশন নষ্ট হয়ে গেছে। 'rm -rf auth_info_baileys' দিয়ে ডিলিট করে আবার রান করুন।");
             }
         } else if (connection === 'open') {
             console.log('✅ আলহামদুলিল্লাহ! বট সফলভাবে কানেক্টেড এবং রানিং।');
         }
     });
-
-    // ... (বাকি মেসেজ রিসিভ করার কোড যেমন আছে তেমনই থাকবে) ...
-
-    sock.ev.on('creds.update', saveCreds);
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
-            console.log("\n🔗 QR Code Link: " + `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}` + "\n");
-        }
-
-        if (connection === 'close') {
-            // কারণ চেক করা
-            const reason = lastDisconnect.error?.output?.statusCode;
-            console.log(`⚠️ কানেকশন বন্ধ! কারণ: ${reason}`);
-
-            // যদি লগআউট না হয়, তবে রিকানেক্ট করবে
-            if (reason !== DisconnectReason.loggedOut) {
-                console.log("🔄 ৫ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে...");
-                setTimeout(connectToWhatsApp, 5000); // ৫ সেকেন্ড ডিলে
-            } else {
-                console.log("❌ সেশন নষ্ট হয়ে গেছে। নতুন করে QR স্ক্যান করুন।");
-                // সেশন ফোল্ডার ডিলিট করার কোড এখানে দেওয়া যেতে পারে
-            }
-        } else if (connection === 'open') {
-            console.log('✅ আলহামদুলিল্লাহ! বট কানেক্টেড।');
-        }
-    });
+    
+    // ==========================================
+    // 📩 মেসেজ রিসিভ করার লজিক
+    // ==========================================
+    sock.ev.on('messages.upsert', async m => {
+        // ... (আপনার আগের মেসেজ রিসিভ করার সব কোড এখানে থাকবে) ...
 
     sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
