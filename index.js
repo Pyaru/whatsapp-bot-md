@@ -109,7 +109,7 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, 
+        printQRInTerminal: true, 
         logger: pino({ level: "silent" }),
         // 🔥 ম্যাজিক: হোয়াটসঅ্যাপকে বোকা বানানোর জন্য Chrome এর লেটেস্ট ভার্সন
         browser: Browsers.macOS('Desktop'), 
@@ -135,6 +135,7 @@ const safeReply = async (jid, textObj) => {
     await sock.sendPresenceUpdate('paused', jid);
 };
 
+   /*
     // ==========================================
 // 🚀 কানেকশন (শুধুমাত্র Pairing Code)
 // ==========================================
@@ -152,6 +153,7 @@ const safeReply = async (jid, textObj) => {
             }
         }, 5000);
     }
+    */
 
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
@@ -174,7 +176,6 @@ const safeReply = async (jid, textObj) => {
 
     // ... (বাকি মেসেজ রিসিভ করার কোড যেমন আছে তেমনই থাকবে) ...
 
-  /*
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -200,7 +201,6 @@ const safeReply = async (jid, textObj) => {
             console.log('✅ আলহামদুলিল্লাহ! বট কানেক্টেড।');
         }
     });
-    */
 
     sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
