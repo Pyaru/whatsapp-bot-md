@@ -66,6 +66,13 @@ const supportModeUsers = new Set();
 const fuseOptions = { keys: ['name'], threshold: 0.4, includeScore: true, ignoreLocation: true, minMatchCharLength: 3 };
 let fuse = new Fuse([], fuseOptions);
 const toEnglishDigits = (str) => str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]);
+// 🔥 এই ফাংশনটি মিসিং ছিল
+const cleanUserQuery = (text) => {
+    let cleaned = text.replace(/বইটা|বই|দেন|দিন|আছে|কি|চাই|রিসালা|কিতাব|পিডিএফ|pdf|book|download|link|টা/gi, "");
+    cleaned = cleaned.replace(/নামাজ/g, "নামায"); 
+    cleaned = cleaned.replace(/রমজান/g, "রমযান");
+    return cleaned.trim();
+};
 
 // ==========================================
 // 🚀 বটের কমান্ড ও লজিক
