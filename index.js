@@ -9,7 +9,7 @@ const { getGeminiReply, extractBookKeyword } = require('./ai'); // আপনা�
 // 📊 কনফিগারেশন
 // ==========================================
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-const adminID = "আপনার_টেলিগ্রাম_আইডি_এখানে_দিন"; // (পরে কিভাবে পাবেন বলে দিচ্ছি)
+const adminID = "6580762355"; // আপনার টেলিগ্রাম আইডি
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=1594849656&single=true&output=csv";
 const PDF_LIST_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ19XPVA-RJZJMAKYyL6atGl-HrpWMf0kruA_A1qIC6FNksEaJmd7jcrTCfVxGYzw/pub?gid=456120804&single=true&output=pdf"; 
